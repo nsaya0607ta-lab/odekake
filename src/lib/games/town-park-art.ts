@@ -199,6 +199,24 @@ function bamboo(k: Kit) {
     }
     oval(top, 2.6, 1.4, "#6aa64a");
     if (paintState.snow) oval({ x: top.x, y: top.y - .6 }, 2.2, .9, "#f3f6f9e8");
+    if (paintState.tanabata && h > 32) tanzaku(k, base, top, h, j);
+  }
+}
+/** Tanabata: paper wishes (tanzaku), a paper chain and streamers tied to the leafy upper part of a culm. */
+function tanzaku(k: Kit, base: Point, top: Point, h: number, j: number) {
+  const colors = ["#e15b4f", "#f2c43c", "#4f8fc0", "#5aa469", "#f6f1e6", "#b97ac9"];
+  const along = (z: number) => ({ x: base.x + (top.x - base.x) * z / h, y: base.y + (top.y - base.y) * z / h });
+  for (let n = 0; n < 4; n++) {
+    const z = h * (.52 + n * .12), p = along(z), out = (noise(j * 13 + n * 7) - .5) * 2, x = p.x + out * 3.6, y = p.y + 1.6;
+    k.line({ x: p.x + out * 2.2, y: p.y + .6 }, { x, y }, "#e9e4d6", .25);
+    k.poly([{ x: x - .7, y }, { x: x + .7, y: y - .25 }, { x: x + .7, y: y + 3.1 }, { x: x - .7, y: y + 3.35 }], colors[(j + n) % colors.length]!);
+  }
+  if (j % 3 === 0) {
+    // A short paper chain hanging in a curve, and streamers from the top.
+    const a = along(h * .66), b = along(h * .8), sag = 2.4;
+    for (let n = 0; n <= 6; n++) { const t = n / 6, x = a.x - 3 + (b.x + 3 - (a.x - 3)) * t, y = a.y + (b.y - a.y) * t + Math.sin(t * Math.PI) * sag; k.oval({ x, y }, .55, .4, colors[n % colors.length]!); }
+    const crown = along(h * .92);
+    for (let n = 0; n < 5; n++) k.line(crown, { x: crown.x - 1.2 + n * .6, y: crown.y + 5.5 + (n % 2) * .8 }, colors[n % colors.length]!, .55);
   }
 }
 /**
@@ -511,10 +529,15 @@ function jungleGym(k: Kit) {
 export const SPLASH_JETS: readonly [number, number][] = [[.5, .52], [.5, .76], [.29, .62], [.71, .64], [.38, .38], [.62, .4]];
 export const SPLASH_MUSHROOM = [.74, .28] as const, SPLASH_FROG = [.25, .3] as const;
 function splashPad(k: Kit) {
-  const { at, oval, curve } = k;
-  k.disc(.5, .5, .46, 1.02, "#bfc8c2"); k.disc(.5, .5, .43, 1.08, "#8fcadb");
-  for (const radius of [.12, .22, .32, .41]) curve(k.circle(.5, .5, radius, 1.12, 32), "#c4e7f0", .45);
-  for (let j = 0; j < 12; j++) { const a = j * TAU / 12; k.line(at(.5 + Math.cos(a) * .12, .5 + Math.sin(a) * .12, 1.12), at(.5 + Math.cos(a) * .42, .5 + Math.sin(a) * .42, 1.12), "#b0dbe7", .4); }
+  const { at, oval, curve } = k, wet = paintState.season === "default" || paintState.season === "summer";
+  k.disc(.5, .5, .46, 1.02, "#bfc8c2"); k.disc(.5, .5, .43, 1.08, wet ? "#8fcadb" : paintState.snow ? "#eef2f4" : "#d3dad6");
+  for (const radius of [.12, .22, .32, .41]) curve(k.circle(.5, .5, radius, 1.12, 32), wet ? "#c4e7f0" : "#c2cac6", .45);
+  for (let j = 0; j < 12; j++) { const a = j * TAU / 12; k.line(at(.5 + Math.cos(a) * .12, .5 + Math.sin(a) * .12, 1.12), at(.5 + Math.cos(a) * .42, .5 + Math.sin(a) * .42, 1.12), wet ? "#b0dbe7" : "#c8d0cc", .4); }
+  if (!wet) {
+    // Drained outside the summer: the drain in the middle, a damp patch, and fallen leaves blown in.
+    k.disc(.5, .5, .1, 1.1, paintState.snow ? "#e3e9ed" : "#c3ccc9"); k.disc(.5, .5, .045, 1.12, "#8f9a97");
+    if (!paintState.snow && paintState.foliage > .3) for (let j = 0; j < 9; j++) { const a = noise(j * 5) * TAU, d = .12 + noise(j * 9) * .26; oval(at(.5 + Math.cos(a) * d, .5 + Math.sin(a) * d, 1.13), .8, .45, ["#d0763e", "#e2b23c", "#b9563c"][j % 3]!); }
+  }
   SPLASH_JETS.forEach(([u, v], j) => { oval(at(u, v, 1.15), 1.7, .85, ["#f08fae", "#f5cf4c", "#7cc489"][j % 3]!); oval(at(u, v, 1.2), .7, .35, "#3f6b78"); });
   // Mushroom shower.
   const [mu, mv] = SPLASH_MUSHROOM;

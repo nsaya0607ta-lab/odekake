@@ -2,6 +2,8 @@ import { MAP_SIZE, PARK_PARTS, canBuyPark, canPlaceParkPart, lotTiles, neighbour
 import { DIRECTIONS, elevationAt, measureTransportRoute, sampleTransportDistance, sampleTransportPath, stationAxis, trackPaths, trackPoint, transportHeight, transportMask, transportOutline, type TransportKind, type TransportRoute } from "./town-transport";
 import { clockDials, drawTownDecoration, decorationPickFaces } from "./town-decorations";
 import { PARK_ART_HEIGHT, PARK_ART_LIGHTS, PARK_ART_SWAY, drawParkArt, parkArtVariant } from "./town-park-art";
+import { tanabataSeason } from "./town-park-motion";
+import { parkGates } from "./town-park-paths";
 import { TownSprites, type SpriteBounds } from "./town-sprites";
 import { buildingHeight, buildingLevel, buildingVolumes, factoryLayout, facilityLayout, roofFeatures, type FacilityPlacement } from "./town-building-models";
 import { lightGradient, NIGHT_AMBIENT, paintState, resetPaintState, shade, snowy, type TreePalette } from "./town-paint";
@@ -852,16 +854,31 @@ function parkGround(c: CanvasRenderingContext2D, lot: ParkLot, town: Town) {
     }
   }
 }
-function parkFence(c: CanvasRenderingContext2D, x: number, y: number, bit: number, gate: boolean) {
+/** One side of a park's fence, or the stretch of it from `from` to `to` (0..1 along the side). */
+function parkFence(c: CanvasRenderingContext2D, x: number, y: number, bit: number, gate: boolean, from = 0, to = 1) {
   const a = bit === 1 ? { x: .04, y: .04 } : bit === 2 ? { x: .96, y: .04 } : bit === 4 ? { x: .04, y: .04 } : { x: .04, y: .96 };
   const b = bit === 1 || bit === 2 ? { x: a.x, y: .96 } : { x: .96, y: a.y };
   const at = (t: number, z: number) => iso(x + a.x + (b.x - a.x) * t, y + a.y + (b.y - a.y) * t, z);
+  const here = (t: number) => t >= from && (t < to || t === 1);
   for (const [start, end] of gate ? [[0, .29], [.71, 1]] : [[0, 1]]) {
-    line(c, at(start!, 6), at(end!, 6), "#819b6a", 1.2);
-    line(c, at(start!, 3.5), at(end!, 3.5), "#8da076", .75);
-    line(c, at(start!, 6.5), at(end!, 6.5), "#c9cba080", .55);
+    const s = Math.max(start!, from), e = Math.min(end!, to);
+    if (e > s) {
+      line(c, at(s, 6), at(e, 6), "#819b6a", 1.2);
+      line(c, at(s, 3.5), at(e, 3.5), "#8da076", .75);
+      line(c, at(s, 6.5), at(e, 6.5), "#c9cba080", .55);
+    }
     const posts = Math.ceil((end! - start!) * 4);
-    for (let j = 0; j <= posts; j++) { const t = start! + (end! - start!) * j / posts; line(c, at(t, 1), at(t, 7), "#6c8b5d", 1.6); line(c, { x: at(t, 1).x - .35, y: at(t, 1).y }, { x: at(t, 7).x - .35, y: at(t, 7).y }, "#c3c398", .5); ellipse(c, at(t, 7.2), 1, .55, "#ded2ad"); }
+    for (let j = 0; j <= posts; j++) { const t = start! + (end! - start!) * j / posts; if (!here(t)) continue; line(c, at(t, 1), at(t, 7), "#6c8b5d", 1.6); line(c, { x: at(t, 1).x - .35, y: at(t, 1).y }, { x: at(t, 7).x - .35, y: at(t, 7).y }, "#c3c398", .5); ellipse(c, at(t, 7.2), 1, .55, "#ded2ad"); }
+  }
+  // Stone gateposts either side of the entrance.
+  if (gate) for (const t of [.27, .73]) {
+    if (!here(t)) continue;
+    const foot = at(t, 0), head = at(t, 10.5);
+    ellipse(c, { x: foot.x + .8, y: foot.y + .3 }, 2.6, 1.1, "#3c4a3a33");
+    line(c, foot, head, "#c4b9a1", 3.4);
+    line(c, { x: foot.x + .95, y: foot.y }, { x: head.x + .95, y: head.y }, "#a2977f", 1.3);
+    line(c, { x: foot.x - 1.05, y: foot.y }, { x: head.x - 1.05, y: head.y }, "#e2dac6", .6);
+    ellipse(c, at(t, 10.9), 2.4, 1.25, "#ebe3d0"); ellipse(c, at(t, 11.1), 1.9, .9, "#d9cfb8"); ellipse(c, at(t, 12), 1.05, .95, "#cfc4ab");
   }
 }
 /** Grass colour through the year: fresh in spring, deep in summer, warm in autumn, dry in winter. */
@@ -987,6 +1004,8 @@ export class TownScene {
   camera: TownCamera = { x: 0, y: 0, zoom: 1 };
   /** Fireworks over the town at night, confetti by day (level ups). */
   celebrate(night: boolean) { if (!this.reducedMotion) this.life.celebrate(night); }
+  /** People in a park right now and what they are mostly doing. */
+  parkActivity(lotId: number) { return this.life.activity(lotId); }
   fit(width: number, height: number) {
     this.camera = { x: width / 2, y: height * .53 - MAP_SIZE * H * Math.min(width / 1680, height / 930), zoom: Math.min(width / 1680, height / 930) };
   }
@@ -1041,7 +1060,7 @@ export class TownScene {
   }
   /** Season palettes and snow change artwork, so they take part in the cache keys. */
   private look() {
-    return `${paintState.season}:${paintState.blossom > .15 ? "b" : ""}${Math.round(paintState.foliage * 8)}:${Math.round(paintState.bare * 8)}:${paintState.lush > .35 ? "l" : ""}${paintState.snow ? ":s" : ""}${paintState.liveClocks ? ":c" : ""}${paintState.liveParts ? ":w" : ""}:${paintState.flora}:${Math.round(paintState.wisteria * 8)}`;
+    return `${paintState.season}:${paintState.blossom > .15 ? "b" : ""}${Math.round(paintState.foliage * 8)}:${Math.round(paintState.bare * 8)}:${paintState.lush > .35 ? "l" : ""}${paintState.snow ? ":s" : ""}${paintState.liveClocks ? ":c" : ""}${paintState.liveParts ? ":w" : ""}:${paintState.flora}:${Math.round(paintState.wisteria * 8)}${paintState.tanabata ? ":t" : ""}`;
   }
   private prepareObjects(town: Town) {
     const look = this.look();
@@ -1118,12 +1137,20 @@ export class TownScene {
           { sway: tall, emits: part.kind === "light" || part.kind === "clock" || PARK_ART_LIGHTS.has(part.kind) || part.kind === "parasol", ...(lamp ? { lamp: hash(part.tile * 3.7 + 1) } : {}) });
         if (part.kind === "clock") clocks.push({ x, y, depth: x + y + 1.001, dials: clockDials(x, y, part.rotation) });
       }
+      // One gate on each side that faces a road; people come and go through it.
+      const gates = new Set(parkGates(lot, town.tiles).map(g => `${g.cell}:${g.dx}:${g.dy}`));
       for (const i of lotTiles(lot)) {
         const x = i % MAP_SIZE, y = Math.floor(i / MAP_SIZE);
         for (const { bit, dx, dy } of DIRECTIONS) {
           if (!(dx < 0 && x === lot.x || dx > 0 && x === lot.x + lot.width - 1 || dy < 0 && y === lot.y || dy > 0 && y === lot.y + lot.height - 1)) continue;
-          const nx = x + dx, ny = y + dy, gate = nx >= 0 && ny >= 0 && nx < MAP_SIZE && ny < MAP_SIZE && town.tiles[ny * MAP_SIZE + nx] === "road";
-          add(x, y, dx < 0 || dy < 0 ? .05 : 1.9, `fence:${bit}:${gate}`, { left: -36, top: -8, width: 72, height: 48 }, c => parkFence(c, x, y, bit, gate));
+          const gate = gates.has(`${i}:${dx}:${dy}`), nx = x + dx, ny = y + dy, back = dx < 0 || dy < 0;
+          if (nx < 0 || ny < 0 || nx >= MAP_SIZE || ny >= MAP_SIZE || town.tiles[ny * MAP_SIZE + nx] !== "road") {
+            add(x, y, back ? .05 : 1.9, `fence:${bit}:${gate}`, { left: -36, top: -8, width: 72, height: 48 }, c => parkFence(c, x, y, bit, gate));
+            continue;
+          }
+          // Along a street the fence goes in four stretches, each sorted where it stands, so people on the
+          // sidewalk and passing cars are drawn in front of it and visitors inside behind it.
+          for (let k = 0; k < 4; k++) add(x, y, back ? .08 + .92 * (k + .5) / 4 : .99 + .92 * (k + 1) / 4, `fence:${bit}:${gate}:${k}`, { left: -36, top: -8, width: 72, height: 48 }, c => parkFence(c, x, y, bit, gate, k / 4, (k + 1) / 4));
         }
       }
     }
@@ -1152,7 +1179,7 @@ export class TownScene {
     if (!env) return;
     Object.assign(paintState, {
       litThreshold: env.windows === "late" ? .8 : .25, shopsOpen: env.shopsOpen, snow: env.snowCover, season: env.season,
-      blossom: env.blossom, foliage: env.foliage, bare: env.bare, lush: env.lush, liveClocks: true, liveParts: true, wisteria: env.wisteria, flora: env.flora,
+      blossom: env.blossom, foliage: env.foliage, bare: env.bare, lush: env.lush, liveClocks: true, liveParts: true, wisteria: env.wisteria, flora: env.flora, tanabata: tanabataSeason(env),
     });
   }
   render(c: CanvasRenderingContext2D, width: number, height: number, town: Town, options: SceneOptions, dt: number) {

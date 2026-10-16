@@ -147,6 +147,19 @@ export function TownBuilder({ userId }: { userId: string }) {
   const selectedParts = town.attachments.find(a => a.tile === selected)?.parts;
   const canCustomize = Boolean(selectedLot || active && FACILITY_PARTS.some(p => p.kinds.includes(active)));
   const showSelection = mode === "inspect" && selected !== null && active !== "grass" && active !== "water" && !panel && !scenery && !welcome;
+  // A park's card says how many people are there now and what they are doing.
+  const [parkLife, setParkLife] = useState("");
+  const selectedLotId = showSelection && selectedLot ? selectedLot.id : null;
+  useEffect(() => {
+    if (selectedLotId === null) { setParkLife(""); return; }
+    const read = () => {
+      const life = sceneRef.current?.parkActivity(selectedLotId);
+      setParkLife(life && life.people ? ` · いま${life.people}人${life.doing.length ? `（${life.doing.join("・")}）` : ""}` : "");
+    };
+    read();
+    const timer = window.setInterval(read, 1500);
+    return () => window.clearInterval(timer);
+  }, [selectedLotId]);
   const canUpgrade = active === "house" || active === "shop" || active === "factory";
   const homeTile = town.tiles.indexOf("home");
   const linearTool = mode === "road" || mode === "rail";
@@ -631,7 +644,7 @@ export function TownBuilder({ userId }: { userId: string }) {
     </aside>}
     {showSelection && active && selected !== null && <section ref={selectionRef} className={styles.selectionCard} aria-label="選択した建物" data-selected-tile={selected}>
       <div className={styles.selectionInfo}><strong>{selectedLot ? selectedLot.kind === "park" ? "公園" : "広場" : selectedStage ?? BUILDINGS.find(b => b.id === active)?.title}{town.levels[selected]! > 0 && <small>Lv.{town.levels[selected]}</small>}{selectedLot && <small>{selectedLot.width}×{selectedLot.height}</small>}</strong>
-        <p>{selectedLot ? `部品 ${selectedLot.parts.length}点${selectedLot.parts.length ? "" : " · 部品を追加しよう"}` : active === "home" ? "わんこが待っている、あなたの家です" : canUpgrade ? connected ? `道路接続${active === "house" ? ` · 定員 ${(town.levels[selected] || 1) * 18 + (selectedParts?.includes("terrace") ? 6 : 0)}人` : ""}` : "道路への接続が必要です" : active === "station" ? stats.routes.some(r => r[0] === selected || r[r.length - 1] === selected) ? "列車が運行しています" : "もう1つの駅へ線路をつなごう" : "街をつなぐ道"}</p>
+        <p>{selectedLot ? `部品 ${selectedLot.parts.length}点${selectedLot.parts.length ? parkLife : " · 部品を追加しよう"}` : active === "home" ? "わんこが待っている、あなたの家です" : canUpgrade ? connected ? `道路接続${active === "house" ? ` · 定員 ${(town.levels[selected] || 1) * 18 + (selectedParts?.includes("terrace") ? 6 : 0)}人` : ""}` : "道路への接続が必要です" : active === "station" ? stats.routes.some(r => r[0] === selected || r[r.length - 1] === selected) ? "列車が運行しています" : "もう1つの駅へ線路をつなごう" : "街をつなぐ道"}</p>
       </div>
       {active === "home" && <Link href="/room" className={styles.roomLink} onClick={() => flushSave()}><span>マイルームへ</span><small>部屋に入る</small></Link>}
       {canUpgrade && <button type="button" className={styles.upgrade} aria-label={nextStage ? `${nextStage}へ増築する 建物Lv.${selectedLevel + 1}` : undefined} onClick={upgrade} disabled={!snapshot || Boolean(pendingRequest.current) || busy || town.levels[selected]! >= 3 || !connected || town.money < (town.levels[selected] || 1) * 450}>{town.levels[selected]! >= 3 ? "最大Lv." : <><span>増築する</span><small>建物Lv.{selectedLevel + 1} · <WhitePrice amount={(town.levels[selected] || 1) * 450} /></small></>}</button>}

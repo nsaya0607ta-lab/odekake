@@ -19,8 +19,9 @@ const sky = compile('src/lib/games/town-sky.ts', { './town-builder': game, './to
 const figures = compile('src/lib/games/town-figures.ts', { './town-paint': paint });
 const art = compile('src/lib/games/town-park-art.ts', { './town-paint': paint });
 const motion = compile('src/lib/games/town-park-motion.ts', { './town-paint': paint, './town-figures': figures, './town-park-art': art });
-const life = compile('src/lib/games/town-life.ts', { './town-builder': game, './town-paint': paint, './town-transport': transport, './town-figures': figures, './town-park-art': art, './town-park-motion': motion });
-const { TownScene, drawTownIcon, drawTownPartIcon } = compile('src/lib/games/town-renderer.ts', { './town-builder': game, './town-transport': transport, './town-sprites': sprites, './town-decorations': decorations, './town-building-models': models, './town-paint': paint, './town-environment': environment, './town-sky': sky, './town-life': life, './town-park-art': art });
+const paths = compile('src/lib/games/town-park-paths.ts', { './town-builder': game });
+const life = compile('src/lib/games/town-life.ts', { './town-builder': game, './town-paint': paint, './town-transport': transport, './town-figures': figures, './town-park-art': art, './town-park-motion': motion, './town-park-paths': paths });
+const { TownScene, drawTownIcon, drawTownPartIcon } = compile('src/lib/games/town-renderer.ts', { './town-builder': game, './town-transport': transport, './town-sprites': sprites, './town-decorations': decorations, './town-building-models': models, './town-paint': paint, './town-environment': environment, './town-sky': sky, './town-life': life, './town-park-art': art, './town-park-paths': paths, './town-park-motion': motion });
 const iso = (x, y, z = 0) => ({ x: (x - y) * 32, y: (x + y) * 16 - z });
 const blank = () => ({ ...game.createTown(false), tiles: Array(576).fill('grass'), terrain: Array(576).fill(false), levels: Array(576).fill(0) });
 let passed = 0;
@@ -265,6 +266,24 @@ test('an empty purchased park has no automatic fountain or furniture; paid equip
   const tiles=town.tiles;town=game.placeParkPart(town,125,125,'fountain').town;assert.equal(town.tiles,tiles);fills.length=0;
   scene.render(c,800,600,town,options,0);assert(fills.some(fountainWater));
   town=game.removeParkPart(town,125,125).town;fills.length=0;scene.render(c,800,600,town,options,0);assert(!fills.some(fountainWater));
+});
+test('a park fence along a street is drawn in stretches sorted where they stand, with one gate and gateposts per street side', () => {
+  let town = game.buildLine(blank(), 'road', game.lineTiles(game.indexAt(2, 7), game.indexAt(12, 7))).town;
+  town = game.buyParkLot({ ...town, money: 1e6 }, 4, 5, 'small').town;
+  const scene = new TownScene(), { c, strokes } = recordingContext();
+  scene.camera = { x: 400 - iso(5, 6).x, y: 300 - iso(5, 6).y, zoom: 1 };
+  scene.render(c, 800, 600, town, options, 0);
+  const fences = scene.objects.filter(o => o.key?.startsWith('fence:'));
+  const street = fences.filter(o => o.key.startsWith('fence:8:'));
+  assert.equal(street.length, 8, 'Both tiles on the street side are drawn in four stretches each');
+  assert.equal(fences.length - street.length, 6, 'The other sides stay single pieces');
+  assert.deepEqual([...new Set(street.filter(o => o.key.startsWith('fence:8:true')).map(o => o.tile))], [game.indexAt(4, 6)], 'One gate on the street side');
+  assert(strokes.some(s => s.color === '#c4b9a1'), 'Stone gateposts stand either side of the gate');
+  for (const o of street) {
+    const k = Number(o.key.split(':')[3]), x = o.tile % 24, y = Math.floor(o.tile / 24), near = x + .04 + .92 * k / 4, far = x + .04 + .92 * (k + 1) / 4;
+    assert(o.depth > far + y + .9 + .03, 'Someone inside the park near the fence is drawn behind it');
+    assert(o.depth < near + y + 1.2 + .02, 'Someone on the sidewalk in front is drawn over it');
+  }
 });
 test('selection bounds include a complete multi-cell plot and space for its trees',()=>{
   const town=game.buyParkLot(blank(),5,5,'medium').town,scene=new TownScene();scene.camera={x:195,y:0,zoom:1.4};

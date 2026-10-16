@@ -2,7 +2,8 @@ import { MAP_SIZE, lotTiles, neighbours, type ParkLot, type ParkPart, type Tile,
 import type { TownEnvironment } from "./town-environment";
 import { TAU, drawDog, drawPerson, drawPigeon, ellipse, stroke, type Look, type Point } from "./town-figures";
 import { parkArtVariant } from "./town-park-art";
-import { PAINTED, PART_MOTION, PART_SPOTS, motionDepth, motionKit, spotDuration, spotOpen, type PartFrame, type PartState, type Rider, type SpotKind, type Who } from "./town-park-motion";
+import { PAINTED, PART_MOTION, PART_SPOTS, illuminationSeason, motionDepth, motionKit, spotDuration, spotOpen, type PartFrame, type PartState, type Rider, type SpotKind, type Who } from "./town-park-motion";
+import { parkRoute, parkStroll, parkWays, routeLength, type ParkGate, type ParkWays } from "./town-park-paths";
 import { shade } from "./town-paint";
 import { elevationAt, sampleTransportPath } from "./town-transport";
 
@@ -21,9 +22,15 @@ type Door = { tile: number; kind: Tile; road: number; dx: number; dy: number };
 type Walker = { points: Point[]; lengths: number[]; total: number; s: number; speed: number; look: Look; seed: number; phase: number };
 /** A place in a park where someone does something: plays on a part, sits, looks, queues, or plays on the lawn. */
 type Spot = { key: string; lot: number; kind: SpotKind; part: ParkPart | null; slot: number; x: number; y: number; tile: number; rotation: number; u: number; v: number; z: number; facing: number; side: number; who: Who };
-/** Games on an open patch of lawn: a picnic blanket, cherry-blossom viewing, catch, tag, a kite, soap bubbles, fetch with the dog. */
-type Lawn = "blanket" | "hanami" | "ball" | "tag" | "kite" | "bubbles" | "fetch";
+/**
+ * Games on an open patch of lawn: a picnic blanket, cherry-blossom viewing, catch, tag, a kite, soap bubbles, fetch with the dog;
+ * and while it snows, building a snowman and a snowball fight.
+ */
+type Lawn = "blanket" | "hanami" | "ball" | "tag" | "kite" | "bubbles" | "fetch" | "snowman" | "snowball";
+const SNOW_GAMES: ReadonlySet<Lawn> = new Set<Lawn>(["snowman", "snowball"]);
 const LAWN: Record<Lawn, { who: Who; slots: [number, number][]; weight: number }> = {
+  snowman: { who: "child", slots: [[.28, .6], [.72, .56]], weight: 4 },
+  snowball: { who: "child", slots: [[.16, .54], [.84, .46]], weight: 3 },
   blanket: { who: "any", slots: [[.36, .44], [.63, .42], [.5, .63]], weight: 3 },
   hanami: { who: "adult", slots: [[.32, .42], [.6, .36], [.66, .6], [.38, .64]], weight: 5 },
   ball: { who: "child", slots: [[.16, .52], [.84, .48]], weight: 2 },
@@ -32,8 +39,11 @@ const LAWN: Record<Lawn, { who: Who; slots: [number, number][]; weight: number }
   bubbles: { who: "child", slots: [[.5, .58]], weight: 2 },
   fetch: { who: "adult", slots: [[.3, .62]], weight: 2 },
 };
-/** `spot` is the place they are heading to or using; `using` counts seconds of use (below 0 while still walking there). */
-type Visitor = { lot: number; x: number; y: number; tx: number; ty: number; rest: number; life: number; age: number; look: Look; seed: number; phase: number; spot: string | null; using: number; duration: number; lawn?: Lawn };
+/**
+ * `spot` is the place they are heading to or using; `using` counts seconds of use (below 0 while still walking there).
+ * `path` is the rest of the walk there, round the parts; `leaving` means on the way out through a gate.
+ */
+type Visitor = { lot: number; x: number; y: number; tx: number; ty: number; rest: number; life: number; age: number; look: Look; seed: number; phase: number; spot: string | null; using: number; duration: number; lawn?: Lawn; path?: Point[]; leaving?: boolean; patience?: number };
 type Pigeon = { lot: number; x: number; y: number; dir: number; peck: number; wait: number; fly: { fx: number; fy: number; tx: number; ty: number; t: number } | null; seed: number };
 type MotionPart = { tile: number; kind: ParkPart; rotation: number; x: number; y: number; variant: number; depth: number };
 /** Local (u, v) inside a tile, turned the same way as the park artwork. */
@@ -78,6 +88,56 @@ function kite(c: CanvasRenderingContext2D, hand: Point, time: number, env: TownE
   for (let j = 1; j <= 7; j++) { const q = { x: bottom.x - wx * j * 2.4, y: bottom.y + j * 1.5 + Math.sin(time * 5 + j * .9) * 1.3 }; tail.push(q); c.lineTo(q.x, q.y); }
   c.strokeStyle = n("#f4f1e8"); c.lineWidth = .35; c.stroke();
   tail.forEach((q, j) => { if (j % 2) ellipse(c, q.x, q.y, .9, .45, n(j % 4 === 1 ? "#e15b4f" : "#f0c14b")); });
+}
+/** What people are doing, in the words of the park's card. Quiet things (looking, drinking) only count as people. */
+const DOING: Partial<Record<SpotKind, string>> = {
+  swing: "ブランコ", slide: "すべり台", sand: "砂遊び", seesaw: "シーソー", spring: "ゆらゆら遊具", globe: "回転ジャングル", carousel: "メリーゴーランド", climb: "ジャングルジム",
+  splash: "水遊び", bars: "鉄棒", hoop: "バスケット", queue: "アイス", audience: "演奏", seat: "ひと休み",
+};
+const PLAYING: Record<Lawn, string> = { blanket: "ピクニック", hanami: "お花見", ball: "キャッチボール", tag: "おにごっこ", kite: "たこあげ", bubbles: "シャボン玉", fetch: "犬とボール遊び", snowman: "雪だるま", snowball: "雪合戦" };
+/** A snowman of two packed balls; `size` 0..1 grows while children build it and shrinks as it melts. Finished, it gets a face, arms and a hat. */
+function snowman(c: CanvasRenderingContext2D, p: Point, size: number, night: number, seed: number) {
+  const n = (color: string) => shade(color, night), r1 = 3.4 * Math.min(1, size / .6), r2 = size > .55 ? 2.3 * Math.min(1, (size - .55) / .3) : 0;
+  if (r1 < .2) return;
+  ellipse(c, p.x + 1, p.y + .3, r1 * 1.15, r1 * .4, "#3a4b5a26");
+  ellipse(c, p.x, p.y - r1 * .85, r1, r1 * .9, n("#dbe4ec")); ellipse(c, p.x - r1 * .22, p.y - r1 * 1.02, r1 * .7, r1 * .6, n("#f7fafc"));
+  if (r2 < .2) return;
+  const h = { x: p.x + .1, y: p.y - r1 * 1.6 - r2 * .8 };
+  ellipse(c, h.x, h.y, r2, r2 * .92, n("#dee6ed")); ellipse(c, h.x - r2 * .2, h.y - r2 * .16, r2 * .68, r2 * .58, n("#f8fbfd"));
+  if (size < .95) return;
+  for (const e of [-1, 1]) ellipse(c, h.x + e * .75, h.y - .3, .28, .28, n("#2e2a28"));
+  c.beginPath(); c.moveTo(h.x, h.y + .15); c.lineTo(h.x + 1.9, h.y + .5); c.lineTo(h.x, h.y + .75); c.closePath(); c.fillStyle = n("#e8823a"); c.fill();
+  for (let j = 0; j < 2; j++) ellipse(c, p.x + .1, p.y - r1 * (1.2 - j * .55), .3, .3, n("#3a3532"));
+  for (const e of [-1, 1]) stroke(c, p.x + e * r1 * .78, p.y - r1 * 1.3, p.x + e * (r1 + 2.6), p.y - r1 * 1.85 - (e > 0 ? .6 : 0), n("#6b5236"), .4);
+  c.beginPath(); c.moveTo(h.x - 1.6, h.y - r2 * .62); c.lineTo(h.x + 1.6, h.y - r2 * .62); c.lineTo(h.x + 1.15, h.y - r2 * .62 - 2.2); c.lineTo(h.x - 1.15, h.y - r2 * .62 - 2.2); c.closePath();
+  c.fillStyle = n(seed % 2 ? "#c94b3f" : "#3f6fa8"); c.fill();
+}
+/** Where the Christmas lights wind round each kind of park tree: from the bottom of the crown to the top, in screen pixels. */
+const CROWNS: Partial<Record<ParkPart, { z0: number; z1: number; w0: number; w1: number; turns: number }>> = {
+  tree: { z0: 12, z1: 26, w0: 9, w1: 4, turns: 3 }, cherry: { z0: 17, z1: 33, w0: 12, w1: 5, turns: 3 }, pine: { z0: 9, z1: 34, w0: 10.5, w1: 1.5, turns: 4 },
+  maple: { z0: 13, z1: 26, w0: 13, w1: 6, turns: 3 }, ginkgo: { z0: 15, z1: 37, w0: 7.5, w1: 2, turns: 4 },
+};
+/** Twinkling lights wound round a tree, and a star on top of a pine dressed as a Christmas tree. */
+function treeLights(c: CanvasRenderingContext2D, p: Point, kind: ParkPart, time: number, seed: number, detail: boolean) {
+  const crown = CROWNS[kind]; if (!crown) return;
+  const pine = kind === "pine", count = pine ? 34 : 26;
+  c.save(); c.globalCompositeOperation = "lighter";
+  for (let j = 0; j < count; j++) {
+    const t = (j + .5) / count, a = t * TAU * crown.turns + seed, front = Math.sin(a);
+    if (front < -.35) continue;
+    const w = crown.w0 + (crown.w1 - crown.w0) * t, x = p.x + Math.cos(a) * w, y = p.y - crown.z0 - (crown.z1 - crown.z0) * t + front * w * .3;
+    const on = .55 + .45 * Math.sin(time * (2 + hash(j + seed) * 2) + j * 2.1), color = pine ? ["#ff6b6b", "#ffd15c", "#6bc4ff", "#8dff9a", "#ffffff"][j % 5]! : "#ffe3a0";
+    if (detail) { c.globalAlpha = on * .3; ellipse(c, x, y, 2, 2, color); }
+    c.globalAlpha = .55 + on * .45; ellipse(c, x, y, .55, .55, color);
+  }
+  if (pine) {
+    const top = { x: p.x, y: p.y - crown.z1 - 3 };
+    c.globalAlpha = .45; ellipse(c, top.x, top.y, 3.6, 3.6, "#ffd84a");
+    c.globalAlpha = 1; c.beginPath();
+    for (let j = 0; j < 10; j++) { const r = j % 2 ? .9 : 2.2, a = -Math.PI / 2 + j * Math.PI / 5; c.lineTo(top.x + Math.cos(a) * r, top.y + Math.sin(a) * r); }
+    c.closePath(); c.fillStyle = "#ffe066"; c.fill();
+  }
+  c.restore();
 }
 /** One trip round the slide: up the steps, across the deck, down the chute and back round to the steps. */
 const SLIDE: { from: [number, number, number]; to: [number, number, number]; time: number; sit?: boolean; via?: [number, number][] }[] = [
@@ -140,9 +200,14 @@ export class TownLife {
   private water: number[] = [];
   private parks: ParkLot[] = [];
   private spots = new Map<string, Spot>();
+  private ways = new Map<number, ParkWays>();
   private motions: MotionPart[] = [];
   private states = new Map<number, PartState>();
   private lawnPlans = new Map<number, Lawn>();
+  /** Snowmen on the lawn by tile, 0..1 built; they stay while it snows and melt away after. */
+  private snowmen = new Map<number, number>();
+  /** Park trees that are lit up at Christmas. */
+  private lit: { x: number; y: number; kind: ParkPart; seed: number }[] = [];
   private cherries = new Set<number>();
   private fallers: { x: number; y: number; kind: ParkPart }[] = [];
   private pigeons: Pigeon[] = [];
@@ -199,13 +264,15 @@ export class TownLife {
   }
   /** Where people use the park parts. Rebuilt with the parks; anyone whose spot was removed walks on. */
   private buildSpots(parks: ParkLot[]) {
-    this.spots.clear(); this.motions = []; this.cherries.clear(); this.fallers = [];
+    this.spots.clear(); this.motions = []; this.cherries.clear(); this.fallers = []; this.ways.clear(); this.lit = [];
     const live = new Set<number>();
     for (const lot of parks) {
+      this.ways.set(lot.id, parkWays(lot, this.tiles ?? []));
       const objects = new Map(lot.parts.filter(q => q.kind !== "path" && q.kind !== "stones").map(q => [q.tile, q.kind] as const));
       for (const part of lot.parts) {
         const x = part.tile % MAP_SIZE, y = Math.floor(part.tile / MAP_SIZE), r = part.rotation;
         if (part.kind === "cherry") this.cherries.add(part.tile);
+        if (CROWNS[part.kind]) this.lit.push({ x: x + .5, y: y + .5, kind: part.kind, seed: hash(part.tile) * TAU });
         if (part.kind === "cherry" || part.kind === "maple" || part.kind === "ginkgo") this.fallers.push({ x: x + .5, y: y + .5, kind: part.kind });
         for (const def of PART_SPOTS[part.kind] ?? []) {
           const p = turn(x, y, r, def.u, def.v), key = `${part.tile}:${part.kind}:${def.slot}`, cell = Math.floor(p.y) * MAP_SIZE + Math.floor(p.x);
@@ -227,19 +294,64 @@ export class TownLife {
       }
     }
     for (const tile of [...this.states.keys()]) if (!live.has(tile)) this.states.delete(tile);
-    for (const v of this.visitors) if (v.spot && !this.spots.has(v.spot)) this.leaveSpot(v);
+    for (const cell of [...this.snowmen.keys()]) if (!this.spots.has(`${cell}:lawn:0`)) this.snowmen.delete(cell);
+    for (const v of this.visitors) {
+      if (v.spot && !this.spots.has(v.spot)) this.leaveSpot(v);
+      // Something new may stand in the way: walk round it.
+      else if (v.path?.length && !v.leaving) this.walkTo(v, v.tx, v.ty);
+    }
   }
-  /** A tile of the park with nothing standing on it, so strollers never stop inside a pond or a hedge. */
-  private openCell(lot: ParkLot) {
-    const taken = new Set(lot.parts.filter(p => p.kind !== "path" && p.kind !== "stones").map(p => p.tile)), cells = lotTiles(lot), open = cells.filter(i => !taken.has(i));
-    return this.random.pick(open.length ? open : cells);
+  /** Somewhere free to stand in the park, so strollers and pigeons never stop inside a pond or a hedge. */
+  private strollPoint(lot: ParkLot) {
+    const w = this.ways.get(lot.id);
+    if (w) return parkStroll(w, () => this.random.next());
+    const cell = this.random.pick(lotTiles(lot));
+    return { x: cell % MAP_SIZE + .5, y: Math.floor(cell / MAP_SIZE) + .5 };
+  }
+  private nearestGate(w: ParkWays, x: number, y: number) {
+    let best: ParkGate | undefined;
+    for (const g of w.gates) if (!best || Math.hypot(g.inside.x - x, g.inside.y - y) < Math.hypot(best.inside.x - x, best.inside.y - y)) best = g;
+    return best;
+  }
+  /** Head for a point in the park round anything in the way; from the street, in through the nearest gate. */
+  private walkTo(v: Visitor, x: number, y: number) {
+    const w = this.ways.get(v.lot), to = { x, y };
+    v.tx = x; v.ty = y;
+    if (!w) { v.path = [to]; return; }
+    const { lot } = w, outside = v.x < lot.x || v.y < lot.y || v.x > lot.x + lot.width || v.y > lot.y + lot.height, gate = outside ? this.nearestGate(w, v.x, v.y) : undefined;
+    v.path = gate ? [gate.outside, gate.inside, ...parkRoute(w, gate.inside, to, gate.entry)] : parkRoute(w, { x: v.x, y: v.y }, to);
+    v.patience = 25 + routeLength(v, v.path) / .2;
+  }
+  /** Out through the nearest gate and along the sidewalk; false when the park has no gate. */
+  private leave(v: Visitor) {
+    const w = this.ways.get(v.lot), gate = w && this.nearestGate(w, v.x, v.y);
+    if (!w || !gate) return false;
+    const end = this.random.pick(gate.ends);
+    v.leaving = true; v.tx = end.x; v.ty = end.y;
+    v.path = [...parkRoute(w, { x: v.x, y: v.y }, gate.inside, undefined, gate.entry), gate.outside, end];
+    return true;
+  }
+  /** Move along the path; true while still on the way. */
+  private walk(v: Visitor, step: number) {
+    const path = v.path ?? (v.path = []);
+    if (!path.length && Math.hypot(v.tx - v.x, v.ty - v.y) > .03) path.push({ x: v.tx, y: v.ty });
+    while (path.length && step > 0) {
+      const p = path[0]!, d = Math.hypot(p.x - v.x, p.y - v.y);
+      if (d <= step) { v.x = p.x; v.y = p.y; step -= d; path.shift(); }
+      else { v.x += (p.x - v.x) / d * step; v.y += (p.y - v.y) / d * step; step = 0; }
+    }
+    return path.length > 0;
   }
   private occupied(key: string, except?: Visitor) { return this.visitors.some(v => v !== except && v.spot === key); }
   private fits(who: Who, v: Visitor) { return who === "any" || (who === "child") === (v.look.kind === "child"); }
+  /** Snow games while it snows (not in a blizzard); everything else on a dry day. */
+  private lawnWeather(game: Lawn, env: TownEnvironment) {
+    return SNOW_GAMES.has(game) ? env.snow > 0 && env.snow < .8 && env.rain < .2 : env.rain < .2 && env.snow === 0;
+  }
   /** Lawn games that suit the weather, the time of day and the place. */
   private lawnAllowed(game: Lawn, cell: number, lot: ParkLot, v: Visitor, env: TownEnvironment) {
-    const dry = env.rain < .2 && env.snow === 0, day = env.night < .35, temp = env.temperature ?? 20, x = cell % MAP_SIZE, y = Math.floor(cell / MAP_SIZE);
-    if (!dry || !this.fits(LAWN[game].who, v)) return false;
+    const day = env.night < .35, temp = env.temperature ?? 20, x = cell % MAP_SIZE, y = Math.floor(cell / MAP_SIZE);
+    if (!this.lawnWeather(game, env) || !this.fits(LAWN[game].who, v)) return false;
     switch (game) {
       case "blanket": return day && lot.kind === "park" && temp >= 10 && temp <= 31;
       case "hanami": return env.blossom > .3 && env.night < .8 && [...this.cherries].some(t => Math.abs(t % MAP_SIZE - x) <= 1 && Math.abs(Math.floor(t / MAP_SIZE) - y) <= 1);
@@ -293,14 +405,14 @@ export class TownLife {
     } else v.lawn = undefined;
     v.spot = spot.key; v.using = -1;
     v.duration = spot.kind === "slide" ? SLIDE_TIME * (2 + Math.floor(r.next() * 3)) : spot.kind === "queue" && spot.slot > 0 ? 45 : spotDuration(spot.kind, r.next(), spot.slot);
-    v.tx = spot.x; v.ty = spot.y;
+    this.walkTo(v, spot.x, spot.y);
     return true;
   }
   private leaveSpot(v: Visitor) {
     const spot = v.spot ? this.spots.get(v.spot) : undefined;
     // Step off in front of the thing they used, then wander or pick the next thing.
     if (spot && v.using >= 0) { const p = spot.kind === "swing" ? turn(Math.floor(spot.tile % MAP_SIZE), Math.floor(spot.tile / MAP_SIZE), spot.rotation, spot.u, .92) : { x: spot.x, y: spot.y }; v.x = p.x; v.y = p.y; }
-    v.spot = null; v.using = 0; v.tx = v.x; v.ty = v.y; v.rest = .5 + this.random.next() * 1.5; v.lawn = undefined;
+    v.spot = null; v.using = 0; v.tx = v.x; v.ty = v.y; v.path = []; v.rest = .5 + this.random.next() * 1.5; v.lawn = undefined;
   }
   /** Who is on each slot of a part right now, for its painter and its motion. */
   private ridersOf(tile: number): (Rider | undefined)[] {
@@ -320,8 +432,8 @@ export class TownLife {
       let have = this.pigeons.filter(p => p.lot === lot.id).length;
       const want = busy ? Math.min(6, 2 + Math.floor(lot.width * lot.height / 3)) : 0;
       while (have < want) {
-        const cell = this.openCell(lot);
-        this.pigeons.push({ lot: lot.id, x: cell % MAP_SIZE + .2 + this.random.next() * .6, y: Math.floor(cell / MAP_SIZE) + .2 + this.random.next() * .6, dir: 1, peck: 0, wait: this.random.next() * 2, fly: null, seed: this.random.next() * 100 });
+        const p = this.strollPoint(lot);
+        this.pigeons.push({ lot: lot.id, x: p.x, y: p.y, dir: 1, peck: 0, wait: this.random.next() * 2, fly: null, seed: this.random.next() * 100 });
         have++;
       }
     }
@@ -332,9 +444,9 @@ export class TownLife {
     for (const p of this.pigeons) {
       const lot = this.lots.find(l => l.id === p.lot); if (!lot) continue;
       if (p.fly) { p.fly.t += ambientDt / 1.5; if (p.fly.t >= 1) { p.x = p.fly.tx; p.y = p.fly.ty; p.fly = null; p.wait = 1 + r.next() * 2; } continue; }
-      const startled = this.visitors.some(v => v.lot === p.lot && Math.hypot(v.x - p.x, v.y - p.y) < (v.look.kind === "child" ? .32 : .2) && (Math.hypot(v.tx - v.x, v.ty - v.y) > .03 || v.look.kind === "child" && !v.spot));
+      const startled = this.visitors.some(v => v.lot === p.lot && Math.hypot(v.x - p.x, v.y - p.y) < (v.look.kind === "child" ? .32 : .2) && (Boolean(v.path?.length) || Math.hypot(v.tx - v.x, v.ty - v.y) > .03 || v.look.kind === "child" && !v.spot));
       if (startled) {
-        const cell = this.openCell(lot), tx = cell % MAP_SIZE + .2 + r.next() * .6, ty = Math.floor(cell / MAP_SIZE) + .2 + r.next() * .6;
+        const { x: tx, y: ty } = this.strollPoint(lot);
         p.fly = { fx: p.x, fy: p.y, tx, ty, t: 0 }; p.dir = tx - ty - (p.x - p.y) >= 0 ? 1 : -1;
         continue;
       }
@@ -356,6 +468,15 @@ export class TownLife {
       const game = this.lawnPlans.get(cell); if (!game) continue;
       const cx = cell % MAP_SIZE, cy = Math.floor(cell / MAP_SIZE), slot = (v: Visitor) => this.spots.get(v.spot!)?.slot ?? 0;
       if (game === "blanket" || game === "hanami") add(cx + .5, cy + .5, -.48, c => blanket(c, cx, cy, game, night), { left: -30, top: -6, width: 60, height: 24 });
+      if (game === "snowball") {
+        // Each throws in turn: scoop, throw, and the snowball flies across.
+        const a = people.find(v => slot(v) === 0), b = people.find(v => slot(v) === 1), cycle = (t % 2.6) / 1.3, q = cycle % 1;
+        if (a && b && q > .34 && q < .78) {
+          const from = cycle >= 1 ? { x: cx + .84, y: cy + .46, s: b.look.scale } : { x: cx + .16, y: cy + .54, s: a.look.scale }, to = cycle >= 1 ? { x: cx + .16, y: cy + .54 } : { x: cx + .84, y: cy + .46 };
+          const k = (q - .34) / .44, x = from.x + (to.x - from.x) * k, y = from.y + (to.y - from.y) * k, z = 1 + 9 * from.s + Math.sin(k * Math.PI) * 7 - k * 5;
+          add(x, y, .02, c => { const p = iso(x, y, z), g = iso(x, y, 1); ellipse(c, g.x + .3, g.y + .2, 1, .35, "#3a4b5a26"); ellipse(c, p.x, p.y, 1, 1, shade("#fbfdff", night)); ellipse(c, p.x + .3, p.y + .25, .55, .45, shade("#d9e3ec", night)); }, { left: -4, top: -24, width: 8, height: 26 });
+        }
+      }
       if (game === "ball") {
         const a = people.find(v => slot(v) === 0), b = people.find(v => slot(v) === 1);
         const pa = { x: cx + .16, y: cy + .52 }, pb = { x: cx + .84, y: cy + .48 }, cycle = (t % 2.4) / 1.2, q = cycle % 1, there = cycle >= 1;
@@ -388,6 +509,13 @@ export class TownLife {
               const a = (t * .5 + j / 8 + hash(v.seed)) % 1, x = hand.x + wx * a * 24 + Math.sin(t * 2 + j) * 2, y = hand.y - a * 18 - Math.sin(a * Math.PI) * 2, r = .7 + a * 1.4;
               c.save(); c.globalAlpha *= 1 - a; c.beginPath(); c.arc(x, y, r, 0, TAU); c.strokeStyle = shade(j % 2 ? "#ffffff" : "#d9ccff", night); c.lineWidth = .3; c.stroke(); ellipse(c, x - r * .35, y - r * .35, r * .25, r * .2, "#ffffffbb"); c.restore();
             }
+          } else if (game === "snowman") {
+            // Rolling and patting the snow into shape.
+            drawPerson(c, p, v.look, 0, spot.facing, night, { rain: false, pose: Math.sin(t * 2.4 + v.seed) > 0 ? "crouch" : "bend", side: spot.side, detail, beat });
+          } else if (game === "snowball") {
+            const cycle = (t % 2.6) / 1.3, q = cycle % 1, throwing = (cycle >= 1) === (slot(v) === 1);
+            const pose = throwing ? q < .26 ? "bend" : q < .42 ? "cheer" : "walk" : "walk", jump = !throwing && q > .7 && q < .88 ? Math.sin((q - .7) / .18 * Math.PI) * 1.6 : 0;
+            drawPerson(c, p, v.look, 0, spot.facing, night, { rain: false, pose, side: spot.side, detail, beat, jump });
           } else if (game === "fetch") {
             // Throw, the dog runs out for the ball and brings it back.
             const tau = (t + v.seed) % 4, far = { x: cx + .84, y: cy + .3 }, me = { x: spot.x + .08, y: spot.y + .02 };
@@ -404,6 +532,19 @@ export class TownLife {
         }, game === "kite" ? { left: -44, top: -90, width: 88, height: 96 } : game === "bubbles" ? { left: -30, top: -50, width: 60, height: 56 } : game === "fetch" ? { left: -40, top: -40, width: 80, height: 50 } : { left: -12, top: -26, width: 24, height: 30 });
       }
     }
+  }
+  /** How many people are in a park right now and the two things most of them are doing, for the park's card. */
+  activity(lotId: number) {
+    const lot = this.lots.find(l => l.id === lotId), counts = new Map<string, number>();
+    let people = 0;
+    if (!lot) return { people, doing: [] as string[] };
+    for (const v of this.visitors) {
+      if (v.lot !== lotId || v.leaving || v.x < lot.x || v.y < lot.y || v.x > lot.x + lot.width || v.y > lot.y + lot.height) continue;
+      people++;
+      const spot = v.spot && v.using >= 0 ? this.spots.get(v.spot) : undefined, doing = spot ? spot.kind === "lawn" ? v.lawn && PLAYING[v.lawn] : DOING[spot.kind] : undefined;
+      if (doing) counts.set(doing, (counts.get(doing) ?? 0) + 1);
+    }
+    return { people, doing: [...counts].sort((a, b) => b[1] - a[1]).slice(0, 2).map(([doing]) => doing) };
   }
   /** Construction feedback: rising dust for a new building, a dust cloud for demolition, sparkles for upgrades. */
   changed(before: Town, after: Town) {
@@ -564,17 +705,19 @@ export class TownLife {
   }
   private spawnVisitor(env: TownEnvironment): Visitor | undefined {
     if (!this.parks.length) return;
-    const r = this.random, lot = r.pick(this.parks), cell = this.openCell(lot);
+    const r = this.random, lot = r.pick(this.parks), gates = this.ways.get(lot.id)?.gates ?? [];
     const play = [...this.spots.values()].some(s => s.lot === lot.id && s.who === "child");
-    const kind: Look["kind"] = play && r.next() < .55 || r.next() < .12 ? "child" : r.next() < .3 ? "elder" : "adult";
-    const x = cell % MAP_SIZE + .2 + r.next() * .6, y = Math.floor(cell / MAP_SIZE) + .2 + r.next() * .6;
+    // Children are the first out in the snow.
+    const kind: Look["kind"] = play && r.next() < .55 || r.next() < (env.snow > 0 ? .55 : .12) ? "child" : r.next() < .3 ? "elder" : "adult";
+    // People come along the sidewalk and in through a gate; a park without one fills from the inside.
+    const { x, y } = gates.length ? r.pick(r.pick(gates).ends) : this.strollPoint(lot);
     const look = this.look(env, kind, "walk");
     // About a third of grown-ups bring the dog; children come with a balloon now and then.
     if (look.dog && (kind === "child" || r.next() < .5)) look.dog = null;
     if (kind === "child" && r.next() < .14) { look.carry = "balloon"; look.carryColor = r.pick(BALLOONS); }
-    const v: Visitor = { lot: lot.id, x, y, tx: x, ty: y, rest: 0, life: 34 + r.next() * 46, age: 0, look, seed: Math.floor(r.next() * 1e6), phase: r.next() * TAU, spot: null, using: 0, duration: 0 };
+    const v: Visitor = { lot: lot.id, x, y, tx: x, ty: y, rest: 0, life: 34 + r.next() * 46, age: 0, look, seed: Math.floor(r.next() * 1e6), phase: r.next() * TAU, spot: null, using: 0, duration: 0, path: [] };
     this.visitors.push(v);
-    this.chooseSpot(v);
+    if (!this.chooseSpot(v) && gates.length) { const p = this.strollPoint(lot); this.walkTo(v, p.x, p.y); v.rest = 1 + r.next() * 3; }
     return v;
   }
   /** Advance people and animals. `dt` follows the town speed; `ambientDt` is real time. */
@@ -585,14 +728,14 @@ export class TownLife {
     const walkers = Math.round(Math.min(64, 4 + population / 12) * env.activity);
     let partSpots = 0, lawn = 0;
     for (const s of this.spots.values()) if (s.kind === "lawn") { if (s.slot === 0) lawn++; } else partSpots++;
-    const visitors = Math.round(Math.min(48, this.parks.length * 3 + partSpots * .6 + lawn * .5) * env.activity * (.25 + daylight * .75) * (env.rain > .3 || env.snow > 0 ? .15 : 1));
+    const visitors = Math.round(Math.min(48, this.parks.length * 3 + partSpots * .6 + lawn * .5) * env.activity * (.25 + daylight * .75) * (env.rain > .3 || env.snow >= .8 ? .15 : env.snow > 0 ? .4 : 1));
     if (!this.started && this.doors.length > 1) {
       // Open the town mid-day rather than empty: people are already on their way, part-way along.
       this.started = true;
       for (let j = 0; j < walkers; j++) { this.spawnWalker(env); const w = this.walkers[this.walkers.length - 1]; if (w) w.s = r.next() * w.total * .9; }
       for (let j = 0; j < visitors; j++) {
         const v = this.spawnVisitor(env); if (!v) continue;
-        v.age = 1 + r.next() * v.life * .5;
+        v.age = 1 + r.next() * v.life * .5; v.path = [];
         if (v.spot) { v.x = v.tx; v.y = v.ty; v.using = r.next() * v.duration * .6; } else { v.x = v.tx + (r.next() - .5) * .2; v.y = v.ty + (r.next() - .5) * .2; }
       }
     }
@@ -608,11 +751,11 @@ export class TownLife {
       v.age += dt; v.phase += dt * 9;
       const spot = v.spot ? this.spots.get(v.spot) : undefined;
       // The carousel stops, the band goes home, the rain starts: people leave what has closed.
-      if (spot && !spotOpen(spot.kind, env)) { this.leaveSpot(v); continue; }
+      if (spot && (spot.kind === "lawn" ? !v.lawn || !this.lawnWeather(v.lawn, env) : !spotOpen(spot.kind, env))) { this.leaveSpot(v); continue; }
       // A queue moves up when the person in front has been served.
       if (spot?.kind === "queue" && spot.slot > 0 && !this.occupied(`${spot.tile}:${spot.part}:${spot.slot - 1}`, v)) {
         const ahead = this.spots.get(`${spot.tile}:${spot.part}:${spot.slot - 1}`);
-        if (ahead) { v.spot = ahead.key; v.using = -1; v.tx = ahead.x; v.ty = ahead.y; v.duration = ahead.slot === 0 ? spotDuration("queue", r.next()) : 45; continue; }
+        if (ahead) { v.spot = ahead.key; v.using = -1; this.walkTo(v, ahead.x, ahead.y); v.duration = ahead.slot === 0 ? spotDuration("queue", r.next()) : 45; continue; }
       }
       if (v.spot && v.using >= 0) {
         // Using something runs on real time, so the town speed does not make a swing fly round.
@@ -626,20 +769,23 @@ export class TownLife {
         }
         continue;
       }
-      const d = Math.hypot(v.tx - v.x, v.ty - v.y);
-      if (d > .03) {
-        const step = Math.min(d, dt * .2); v.x += (v.tx - v.x) / d * step; v.y += (v.ty - v.y) / d * step;
+      // Time to go home: out through the gate (a park without one: they fade away where they stand).
+      if (!v.spot && !v.leaving && v.age >= v.life) this.leave(v);
+      if (this.walk(v, dt * .2)) {
         // Someone who cannot get to their spot gives up and strolls on.
-        if (v.spot && (v.using -= dt) < -25) this.leaveSpot(v);
+        if (v.spot && (v.using -= dt) < -(v.patience ?? 25)) this.leaveSpot(v);
       }
       else if (v.spot) v.using = 0;
-      else if ((v.rest -= dt) <= 0) {
+      else if (!v.leaving && (v.rest -= dt) <= 0) {
         const lot = this.parks.find(l => l.id === v.lot);
-        if (lot && !(r.next() < .45 && this.chooseSpot(v))) { const cell = this.openCell(lot); v.tx = cell % MAP_SIZE + .25 + r.next() * .5; v.ty = Math.floor(cell / MAP_SIZE) + .25 + r.next() * .5; v.rest = 2 + r.next() * 5; }
+        if (lot && !(r.next() < .45 && this.chooseSpot(v))) { const p = this.strollPoint(lot); this.walkTo(v, p.x, p.y); v.rest = 2 + r.next() * 5; }
       }
     }
-    // Nobody vanishes in mid-swing: people finish what they are doing before they go home.
-    this.visitors = this.visitors.filter(v => (v.age < v.life || v.spot) && this.parks.some(l => l.id === v.lot));
+    // Nobody vanishes in mid-swing: people finish what they are doing before they go home, and walk out of the gate.
+    this.visitors = this.visitors.filter(v => this.parks.some(l => l.id === v.lot) && (v.leaving ? Boolean(v.path?.length) : v.age < v.life || v.spot));
+    // Snowmen grow while children pack the snow, stay while it snows and melt away after.
+    for (const [cell, game] of this.lawnPlans) if (game === "snowman" && this.visitors.some(v => v.spot?.startsWith(`${cell}:lawn:`) && v.using >= 0)) this.snowmen.set(cell, Math.min(1, (this.snowmen.get(cell) ?? 0) + ambientDt / 24));
+    if (env.snow === 0) for (const [cell, size] of this.snowmen) { if (size - ambientDt / 6 <= 0) this.snowmen.delete(cell); else this.snowmen.set(cell, size - ambientDt / 6); }
     // Lawn games end when the last player leaves.
     for (const cell of [...this.lawnPlans.keys()]) if (![0, 1, 2, 3].some(slot => this.occupied(`${cell}:lawn:${slot}`))) this.lawnPlans.delete(cell);
     // Moving parts: the carousel speeds up and slows down, the globe is pushed, the windmill follows the wind.
@@ -697,7 +843,9 @@ export class TownLife {
       if (spot && spot.kind !== "lawn") { const list = riders.get(spot.tile) ?? []; list[spot.slot] = { look: v.look, using: v.using, duration: v.duration, seed: v.seed }; riders.set(spot.tile, list); }
       if (spot && PAINTED.has(spot.kind)) continue;
       if (spot?.kind === "lawn") { const list = lawnCells.get(spot.tile) ?? []; list.push(v); lawnCells.set(spot.tile, list); continue; }
-      const fade = Math.min(1, v.age / .6, v.spot ? 1 : Math.max(0, v.life - v.age) / .6);
+      // Fade in on arrival; on the way out, fade at the end of the sidewalk (or where they stand in a park without a gate).
+      const gated = Boolean(this.ways.get(v.lot)?.gates.length);
+      const fade = Math.min(1, v.age / .6, v.spot ? 1 : v.leaving ? routeLength(v, v.path ?? []) / .2 : gated ? 1 : Math.max(0, v.life - v.age) / .6);
       const bounds = { left: -12, top: -26, width: 24, height: 30 };
       const draw = (c: CanvasRenderingContext2D, paint: () => void) => {
         if (fade < 1) { c.save(); c.globalAlpha *= Math.max(0, fade); }
@@ -753,7 +901,8 @@ export class TownLife {
         }), bounds);
         continue;
       }
-      const p = iso(v.x, v.y, 1), dx = v.tx - v.x, dy = v.ty - v.y, length = Math.hypot(dx, dy), moving = length > .03, facing = v.ty >= v.y ? 1 : -1;
+      const goal = v.path?.[0] ?? { x: v.tx, y: v.ty }, p = iso(v.x, v.y, 1), dx = goal.x - v.x, dy = goal.y - v.y, length = Math.hypot(dx, dy), moving = length > .03;
+      const facing = !moving || dx + dy >= 0 ? 1 : -1;
       add(v.x, v.y, .03, c => draw(c, () => {
         if (v.look.dog) {
           // A dog on a lead trots behind, or sits beside its owner.
@@ -765,6 +914,12 @@ export class TownLife {
       }), bounds);
     }
     this.drawLawn(add, lawnCells, env, night, detail);
+    for (const [cell, size] of this.snowmen) {
+      const x = cell % MAP_SIZE + .5, y = Math.floor(cell / MAP_SIZE) + .42;
+      add(x, y, .02, c => snowman(c, iso(x, y, 1), size, night, cell), { left: -12, top: -22, width: 24, height: 26 });
+    }
+    // Christmas lights on the park trees in December, from dusk (steady when motion is reduced).
+    if (illuminationSeason(env) && env.night > .2) for (const tree of this.lit) add(tree.x, tree.y, .001, c => treeLights(c, iso(tree.x, tree.y), tree.kind, this.reduced ? 0 : this.time, tree.seed, detail), { left: -22, top: -50, width: 44, height: 54 });
     // Moving parts and the people riding them.
     for (const m of this.motions) {
       const motion = PART_MOTION[m.kind], state = this.states.get(m.tile);
