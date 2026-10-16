@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { Stage } from "./types";
-import { hintCount, starsFor, type HintKind, type RoundState } from "./engine";
+import { hintCount, isSecret, secretAnswers, starsFor, type HintKind, type RoundState } from "./engine";
 
 /**
  * 進みぐあい（セーブデータ）と、コイン・経験値・レベル・実績・称号の決まり。
@@ -25,6 +25,8 @@ const roundSchema = z.object({
   history: z.array(z.object({ text: z.string(), kind: resultKind, at: z.number() })),
   startedAt: z.number(),
   clearedAt: z.number().nullable(),
+  rewardedAt: z.number().nullable().default(null),
+  completedAt: z.number().nullable().default(null),
 });
 
 const saveSchema = z.object({
@@ -35,7 +37,14 @@ const saveSchema = z.object({
   totalPoints: z.number().min(0),
   stages: z.record(
     z.string(),
-    z.object({ clears: z.number().int().min(0), bestStars: z.number().int().min(0).max(3), bestScore: z.number().min(0), firstClearedAt: z.number().nullable() }),
+    z.object({
+      clears: z.number().int().min(0),
+      bestStars: z.number().int().min(0).max(3),
+      bestScore: z.number().min(0),
+      firstClearedAt: z.number().nullable(),
+      /** これまでに一度でも見つけたシークレット（はじめて見つけたときだけ墨コインをわたす） */
+      secretsFound: z.array(z.string()).default([]),
+    }),
   ),
   rounds: z.record(z.string(), roundSchema),
   achievements: z.record(z.string(), z.number()),
@@ -192,13 +201,15 @@ export function addExp(save: SaveData, amount: number): { save: SaveData; levelU
 
 // ---------- 実績 ----------
 
-export type AchievementId = "first_correct" | "first_clear" | "clear_10" | "clear_100" | "no_hint" | "perfect" | "streak_3";
+export type AchievementId = "first_correct" | "first_clear" | "clear_10" | "clear_100" | "no_hint" | "perfect" | "streak_3" | "first_secret" | "all_secrets";
 
 export const ACHIEVEMENTS: { id: AchievementId; name: string; description: string; coins: number }[] = [
   { id: "first_correct", name: "初めての正解", description: "かくれた漢字を1つ見つける", coins: 10 },
   { id: "first_clear", name: "初めてのクリア", description: "ステージを1つクリアする", coins: 20 },
   { id: "no_hint", name: "ノーヒントクリア", description: "ヒントを使わずにクリアする", coins: 30 },
-  { id: "perfect", name: "全問正解", description: "まちがい0・ヒント0で全部の答えを見つける", coins: 50 },
+  { id: "perfect", name: "全問正解", description: "まちがい0・ヒント0で見つける字を全部見つける", coins: 50 },
+  { id: "first_secret", name: "シークレット発見", description: "シークレットの字を1つ見つける", coins: 20 },
+  { id: "all_secrets", name: "シークレット制覇", description: "1つのステージのシークレットを全部見つける", coins: 50 },
   { id: "streak_3", name: "連続クリア", description: "スキップせずに3回続けてクリアする", coins: 30 },
   { id: "clear_10", name: "10ステージクリア", description: "ちがうステージを10個クリアする", coins: 100 },
   { id: "clear_100", name: "100ステージクリア", description: "ちがうステージを100個クリアする", coins: 500 },
@@ -296,20 +307,21 @@ export type ClearReward = {
 };
 
 /**
- * クリアの報酬をわたす。報酬は「保存中のラウンドと同じラウンド」にだけわたし、わたすときにそのラウンドを消す。
- * なので同じラウンドで2回呼ばれても（連打・再読みこみ）二重にはわたさない。
+ * クリアの報酬をわたす（見つける字がそろったとき）。報酬は「保存中のラウンドと同じラウンド」で、
+ * まだ報酬をわたしていない（rewardedAt が null）ときだけわたす。なので連打・再読みこみでも二重にはならない。
+ * ラウンドは消さずに残す（このあともシークレットをさがせるように）。
  */
 export function completeStage(save: SaveData, stage: Stage, round: RoundState, now: number): { save: SaveData; reward: ClearReward | null } {
   const stored = save.rounds[stage.id];
-  if (round.clearedAt === null || !stored || stored.startedAt !== round.startedAt) return { save, reward: null };
-  const prev = save.stages[stage.id] ?? { clears: 0, bestStars: 0, bestScore: 0, firstClearedAt: null };
+  if (round.clearedAt === null || !stored || stored.startedAt !== round.startedAt || stored.rewardedAt !== null) return { save, reward: null };
+  const prev = save.stages[stage.id] ?? { clears: 0, bestStars: 0, bestScore: 0, firstClearedAt: null, secretsFound: [] };
   const firstClear = prev.clears === 0;
-  const stars = starsFor(round);
+  const stars = starsFor(stage, round);
   const starRate = stars === 3 ? 1.5 : stars === 2 ? 1.25 : 1;
   const coins = firstClear ? Math.round(stage.reward.coins * starRate) : stage.reward.replayCoins;
   const exp = (firstClear ? stage.reward.exp : stage.reward.replayExp) + (round.found.length - round.revealed.length) * 5;
 
-  let next: SaveData = dropRound(save, stage.id);
+  let next: SaveData = saveRound(save, { ...round, rewardedAt: now });
   next = {
     ...next,
     coins: next.coins + coins,
@@ -319,6 +331,7 @@ export function completeStage(save: SaveData, stage: Stage, round: RoundState, n
     stages: {
       ...next.stages,
       [stage.id]: {
+        ...prev,
         clears: prev.clears + 1,
         bestStars: Math.max(prev.bestStars, stars),
         bestScore: Math.max(prev.bestScore, round.score),
@@ -330,8 +343,9 @@ export function completeStage(save: SaveData, stage: Stage, round: RoundState, n
   next = leveled.save;
 
   const ids: AchievementId[] = ["first_clear"];
-  if (hintCount(round) === 0) ids.push("no_hint");
-  if (hintCount(round) === 0 && round.misses === 0) ids.push("perfect");
+  const mainHints = hintCount(round, stage);
+  if (mainHints === 0) ids.push("no_hint");
+  if (mainHints === 0 && round.misses === 0) ids.push("perfect");
   if (next.clearStreak >= 3) ids.push("streak_3");
   if (clearedStageCount(next) >= 10) ids.push("clear_10");
   if (clearedStageCount(next) >= 100) ids.push("clear_100");
@@ -350,6 +364,44 @@ export function completeStage(save: SaveData, stage: Stage, round: RoundState, n
       achievements: unlocked.unlocked,
     },
   };
+}
+
+/** シークレットを、そのステージではじめて見つけたときの墨コイン */
+export const SECRET_COINS = 10;
+
+/**
+ * クリアのあとにシークレットを見つけたときの記録。点数を累計に足し、はじめて見つけた字なら墨コインをわたす。
+ * （クリアの前に見つけたシークレットの点数は、クリアの報酬のときにまとめて累計に入る）
+ */
+export function recordSecret(
+  save: SaveData,
+  stage: Stage,
+  char: string,
+  points: number,
+  afterClear: boolean,
+  now: number,
+): { save: SaveData; coins: number; achievements: AchievementId[] } {
+  const answer = stage.answers.find((a) => a.char === char);
+  if (!answer || !isSecret(answer)) return { save, coins: 0, achievements: [] };
+  const prev = save.stages[stage.id] ?? { clears: 0, bestStars: 0, bestScore: 0, firstClearedAt: null, secretsFound: [] };
+  const firstTime = !prev.secretsFound.includes(char);
+  const coins = firstTime ? SECRET_COINS : 0;
+  const secretsFound = firstTime ? [...prev.secretsFound, char] : prev.secretsFound;
+  const round = save.rounds[stage.id];
+  let next: SaveData = {
+    ...save,
+    coins: save.coins + coins,
+    totalPoints: save.totalPoints + (afterClear ? points : 0),
+    stages: {
+      ...save.stages,
+      [stage.id]: { ...prev, secretsFound, bestScore: afterClear && round ? Math.max(prev.bestScore, round.score) : prev.bestScore },
+    },
+  };
+  const ids: AchievementId[] = ["first_secret"];
+  if (secretAnswers(stage).every((a) => secretsFound.includes(a.char))) ids.push("all_secrets");
+  const unlocked = unlock(next, ids, now);
+  next = unlocked.save;
+  return { save: next, coins, achievements: unlocked.unlocked };
 }
 
 /** スキップ（あきらめて答えを見る）。報酬はなく、連続クリアが切れる */

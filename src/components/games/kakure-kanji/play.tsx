@@ -7,9 +7,12 @@ import {
   HINT_ORDER,
   canUseHint,
   applyHint,
+  hintCount,
+  isSecret,
+  mainAnswers,
   newRound,
-  orderedAnswers,
   partHintStrokes,
+  secretAnswers,
   strokeCountOf,
   submit,
   totalAnswers,
@@ -21,8 +24,10 @@ import {
   ACHIEVEMENTS,
   buyHint,
   completeStage,
+  dropRound,
   expToNext,
   recordAnswers,
+  recordSecret,
   saveRound,
   titleFor,
   type AchievementId,
@@ -66,18 +71,18 @@ export function PlayScreen({
   onSettings: () => void;
   onAchievements: (unlocked: AchievementId[]) => void;
 }) {
-  // クリアしたラウンドは保存データから消えるので、クリア画面を閉じるまではここで持っておく
-  const [finished, setFinished] = useState<RoundState | null>(null);
-  const round = save.rounds[stage.id] ?? finished ?? undefined;
-  const answers = useMemo(() => orderedAnswers(stage), [stage]);
+  const round = save.rounds[stage.id];
+  // 見つける字（小学校で習う字）→ シークレット（小学校で習わない字）の順
+  const mains = useMemo(() => mainAnswers(stage), [stage]);
+  const secrets = useMemo(() => secretAnswers(stage), [stage]);
+  const answers = useMemo(() => [...mains, ...secrets], [mains, secrets]);
   const total = totalAnswers(stage);
 
-  // はじめて開いたとき・クリア後にもう一度遊ぶときは、新しいラウンドを作る
+  // はじめて開いたとき・「もう一度」のときは、新しいラウンドを作る
   useEffect(() => {
-    if (finished) return;
     const current = readSave();
     if (!current.rounds[stage.id]) commit(saveRound(current, newRound(stage, Date.now())));
-  }, [stage, round, finished, commit, readSave]);
+  }, [stage, round, commit, readSave]);
 
   const [selected, setSelected] = useState<Set<number>>(() => new Set());
   const [feedback, setFeedback] = useState<Feedback>({ tone: "plain", text: START_MESSAGE, key: 0 });
@@ -91,6 +96,7 @@ export function PlayScreen({
   const [detail, setDetail] = useState<Answer | null>(null);
   const [clear, setClear] = useState<{ reward: ClearReward; round: RoundState } | null>(null);
   const [confirmSkip, setConfirmSkip] = useState(false);
+  const [complete, setComplete] = useState(false);
 
   const boardRef = useRef<HTMLDivElement>(null);
   const slotRefs = useRef(new Map<string, HTMLButtonElement>());
@@ -114,7 +120,7 @@ export function PlayScreen({
   const handleSubmit = useCallback(() => {
     const current = readSave();
     const live = current.rounds[stage.id];
-    if (!live || live.clearedAt !== null) return;
+    if (!live || live.completedAt !== null) return;
     const now = Date.now();
     const outcome = submit(stage, live, selected, now);
     const result = outcome.result;
@@ -134,6 +140,14 @@ export function PlayScreen({
     // クリアでとれた実績はクリア画面に出すので、トーストには「初めての正解」などだけを出す
     const unlocked: AchievementId[] = [...recorded.unlocked];
 
+    let secretCoins = 0;
+    if (outcome.gained?.secret) {
+      const secret = recordSecret(next, stage, outcome.gained.answer.char, outcome.gained.points, live.clearedAt !== null, now);
+      next = secret.save;
+      secretCoins = secret.coins;
+      unlocked.push(...secret.achievements);
+    }
+
     let reward: ClearReward | null = null;
     if (outcome.cleared) {
       const done = completeStage(next, stage, outcome.round, now);
@@ -141,12 +155,17 @@ export function PlayScreen({
       reward = done.reward;
     }
     commit(next);
-    if (outcome.cleared) setFinished(outcome.round);
 
     if (outcome.gained) {
-      const { answer, points } = outcome.gained;
+      const { answer, points, secret } = outcome.gained;
       setSelected(new Set());
-      setFeedback({ tone: "good", text: `「${answer.char}」を見つけた！ +${points}点`, key });
+      setFeedback({
+        tone: "good",
+        text: secret
+          ? `シークレット発見！「${answer.char}」 +${points}点${secretCoins ? `・墨コイン+${secretCoins}枚` : ""}`
+          : `「${answer.char}」を見つけた！ +${points}点`,
+        key,
+      });
       setGlow({ strokes: [...normalizeSelection(stage, selected)], key });
       setBoardPulse(key);
       setScorePop({ points, key });
@@ -175,6 +194,12 @@ export function PlayScreen({
         playSfx("clear", sound);
       }, 1200);
     }
+    if (outcome.completed) {
+      later(() => {
+        setComplete(true);
+        playSfx("clear", sound);
+      }, 1200);
+    }
   }, [commit, launchFlyer, later, onAchievements, readSave, selected, sound, stage]);
 
   const spendHint = (answerChar: string, kind: HintKind) => {
@@ -195,8 +220,8 @@ export function PlayScreen({
       setGlow({ strokes: answer?.strokeSets[0] ?? [], key });
       setFeedback({ tone: "info", text: `「${answerChar}」を開きました（点数は入りません）`, key });
       later(() => launchFlyer(answerChar), 60);
-      if (nextRound.clearedAt !== null) {
-        setFinished(nextRound);
+      if (nextRound.completedAt !== null && live.completedAt === null && live.clearedAt !== null) later(() => setComplete(true), 1000);
+      if (nextRound.clearedAt !== null && live.clearedAt === null) {
         const done = completeStage(next, stage, nextRound, now);
         next = done.save;
         if (done.reward) {
@@ -213,7 +238,8 @@ export function PlayScreen({
 
   const retry = () => {
     setClear(null);
-    setFinished(null);
+    setComplete(false);
+    commit(dropRound(readSave(), stage.id));
     setGlow(null);
     setSelected(new Set());
     setFeedback({ tone: "plain", text: "もう一度！ こんどはヒントなし・まちがいなしをめざそう", key: seq.current++ });
@@ -222,7 +248,45 @@ export function PlayScreen({
   if (!round) return <div className={styles.scroll} aria-busy="true" />;
 
   const nextHintTarget = answers.find((a) => !found.has(a.char))?.char ?? null;
-  const progress = round.found.length / Math.max(1, total);
+  const foundMain = mains.filter((a) => found.has(a.char)).length;
+  const foundSecret = secrets.filter((a) => found.has(a.char)).length;
+  const progress = foundMain / Math.max(1, total);
+
+  const renderSlot = (answer: Answer, name: string) => {
+    const isFound = found.has(answer.char);
+    const used = round.hints[answer.char] ?? [];
+    const note = !isFound ? hintNote(answer, used) : null;
+    const secret = isSecret(answer);
+    return (
+      <button
+        key={answer.char}
+        role="listitem"
+        type="button"
+        ref={(el) => {
+          if (el) slotRefs.current.set(answer.char, el);
+          else slotRefs.current.delete(answer.char);
+        }}
+        className={`${styles.slot} ${isFound ? styles.mincho : ""}`}
+        data-found={isFound ? "true" : "false"}
+        data-secret={secret ? "true" : undefined}
+        data-revealed={round.revealed.includes(answer.char) ? "true" : undefined}
+        data-pop={pop?.char === answer.char ? "true" : undefined}
+        onClick={() => (isFound ? setDetail(answer) : setHintTarget(answer.char))}
+        aria-label={isFound ? `${name}「${answer.char}」見つけた。説明を見る` : `${name} まだ見つけていない（${TIER_LABEL[answer.tier]}）。ヒントを見る`}
+      >
+        {isFound ? answer.char : secret ? "🔒" : "？"}
+        {!isFound && note && <span className={styles.slotNote}>{note}</span>}
+        {isFound && answer.grade !== null && <span className={styles.slotGrade}>{answer.grade}年</span>}
+        {!isFound && (
+          <span className={styles.slotTier} aria-hidden="true">
+            {Array.from({ length: answer.tier }, (_, n) => (
+              <i key={n} />
+            ))}
+          </span>
+        )}
+      </button>
+    );
+  };
 
   return (
     <>
@@ -264,59 +328,45 @@ export function PlayScreen({
                 playSfx("tap", sound);
               }}
               glow={glow}
-              disabled={round.clearedAt !== null}
+              disabled={round.completedAt !== null}
               label={`出題漢字「${stage.kanji}」。線をタップすると黒くなります。いま${selected.size}本えらんでいます`}
             />
           </div>
 
           <div className={styles.counter} aria-live="polite">
             <span>
-              <b>{round.found.length}</b> / {total} 見つけた
+              <b>{foundMain}</b> / {total} 見つけた
             </span>
             <span className={styles.progressTrack} aria-hidden="true">
               <span className={styles.progressFill} style={{ display: "block", transform: `scaleX(${progress})` }} />
             </span>
+            {round.clearedAt !== null && <span className={styles.clearBadge}>クリア済み</span>}
           </div>
 
-          <div className={styles.slots} role="list" aria-label="答えの一覧">
-            {answers.map((answer, i) => {
-              const isFound = found.has(answer.char);
-              const used = round.hints[answer.char] ?? [];
-              const note = !isFound ? hintNote(answer, used) : null;
-              return (
-                <button
-                  key={answer.char}
-                  role="listitem"
-                  type="button"
-                  ref={(el) => {
-                    if (el) slotRefs.current.set(answer.char, el);
-                    else slotRefs.current.delete(answer.char);
-                  }}
-                  className={`${styles.slot} ${isFound ? styles.mincho : ""}`}
-                  data-found={isFound ? "true" : "false"}
-                  data-revealed={round.revealed.includes(answer.char) ? "true" : undefined}
-                  data-pop={pop?.char === answer.char ? "true" : undefined}
-                  onClick={() => (isFound ? setDetail(answer) : setHintTarget(answer.char))}
-                  aria-label={
-                    isFound
-                      ? `答え${i + 1}「${answer.char}」見つけた。説明を見る`
-                      : `答え${i + 1} まだ見つけていない（${TIER_LABEL[answer.tier]}）。ヒントを見る`
-                  }
-                >
-                  {isFound ? answer.char : "？"}
-                  {!isFound && note && <span className={styles.slotNote}>{note}</span>}
-                  {isFound && answer.rare && <span className={styles.slotRare}>めずらしい</span>}
-                  {!isFound && (
-                    <span className={styles.slotTier} aria-hidden="true">
-                      {Array.from({ length: answer.tier }, (_, n) => (
-                        <i key={n} />
-                      ))}
-                    </span>
-                  )}
-                </button>
-              );
-            })}
+          <div
+            className={`${styles.slots} ${styles.mainSlots}`}
+            role="list"
+            aria-label="見つける漢字（小学校で習う字）"
+            style={{ gridTemplateColumns: `repeat(${Math.min(5, mains.length)}, minmax(0, 76px))`, justifyContent: "center" }}
+          >
+            {mains.map((answer, i) => renderSlot(answer, `答え${i + 1}`))}
           </div>
+
+          {secrets.length > 0 && (
+            <section className={styles.secretBox} aria-label="シークレット">
+              <h2 className={styles.secretHead}>
+                <span>🔒 シークレット</span>
+                <small>小学校で習わない、難しい字</small>
+                <b>
+                  {foundSecret} / {secrets.length}
+                </b>
+              </h2>
+              <div className={styles.slots} role="list">
+                {secrets.map((answer, i) => renderSlot(answer, `シークレット${i + 1}`))}
+              </div>
+              {round.clearedAt === null && <p className={styles.secretNote}>シークレットはクリアに入りません。クリアしたあとも、つづけてさがせます。</p>}
+            </section>
+          )}
 
           <p key={feedback.key} className={styles.feedback} data-tone={feedback.tone} role="status" aria-live="polite">
             {feedback.text}
@@ -341,7 +391,7 @@ export function PlayScreen({
             <button type="button" className={styles.secondary} style={{ height: 52, padding: "0 16px" }} onClick={() => setSelected(new Set())} disabled={selected.size === 0}>
               けす
             </button>
-            <button type="button" className={`${styles.primary} ${styles.okButton}`} onClick={handleSubmit} disabled={selected.size === 0 || round.clearedAt !== null}>
+            <button type="button" className={`${styles.primary} ${styles.okButton}`} onClick={handleSubmit} disabled={selected.size === 0 || round.completedAt !== null}>
               OK<small>{selected.size > 0 ? `えらんだ線 ${selected.size}本で答える` : "線をタップしてえらぶ"}</small>
             </button>
           </div>
@@ -395,7 +445,48 @@ export function PlayScreen({
         </Sheet>
       )}
 
-      {clear && <ClearDialog stage={stage} save={save} clear={clear} sound={sound} onReview={onReview} onExit={onExit} onRetry={retry} />}
+      {clear && (
+        <ClearDialog
+          stage={stage}
+          save={save}
+          clear={clear}
+          sound={sound}
+          secretsLeft={secrets.length - foundSecret}
+          onContinue={() => {
+            setClear(null);
+            setFeedback({ tone: "info", text: `つづけてシークレットをさがそう（あと${secrets.length - foundSecret}個）`, key: seq.current++ });
+          }}
+          onReview={onReview}
+          onExit={onExit}
+          onRetry={retry}
+        />
+      )}
+
+      {complete && (
+        <Sheet title="コンプリート" hideTitle onClose={() => setComplete(false)} center>
+          <p className={`${styles.clearTitle} ${styles.mincho}`}>コンプリート！</p>
+          <p className={styles.explainText} style={{ textAlign: "center" }}>
+            「{stage.kanji}」にかくれていた字を、シークレットまで全部（{answers.length}個）見つけた！
+          </p>
+          <div className={styles.rewardRows}>
+            <div className={styles.rewardRow}>
+              <span>このステージの点数</span>
+              <b>{round.score.toLocaleString("ja-JP")}点</b>
+            </div>
+          </div>
+          <button type="button" className={`${styles.primary} ${styles.bigButton}`} onClick={onReview}>
+            答えと解説を見る
+          </button>
+          <div className={styles.actions}>
+            <button type="button" className={styles.secondary} onClick={retry}>
+              もう一度
+            </button>
+            <button type="button" className={styles.secondary} onClick={onExit}>
+              ステージ一覧
+            </button>
+          </div>
+        </Sheet>
+      )}
     </>
   );
 }
@@ -483,7 +574,8 @@ function HintSheet({
       </Sheet>
     );
   }
-  const position = answers.findIndex((a) => a.char === answer.char) + 1;
+  const group = answers.filter((a) => isSecret(a) === isSecret(answer));
+  const name = `${isSecret(answer) ? "シークレット" : "答え"}${group.findIndex((a) => a.char === answer.char) + 1}`;
   const used = round.hints[answer.char] ?? [];
   const move = (step: number) => {
     const next = open[(index + step + open.length) % open.length];
@@ -496,7 +588,7 @@ function HintSheet({
           ‹
         </button>
         <strong>
-          答え{position}（{TIER_LABEL[answer.tier]}）
+          {name}（{TIER_LABEL[answer.tier]}）
         </strong>
         <button type="button" className={styles.close} onClick={() => move(1)} aria-label="次の答え" disabled={open.length < 2}>
           ›
@@ -592,6 +684,8 @@ function ClearDialog({
   save,
   clear,
   sound,
+  secretsLeft,
+  onContinue,
   onReview,
   onExit,
   onRetry,
@@ -600,6 +694,8 @@ function ClearDialog({
   save: SaveData;
   clear: { reward: ClearReward; round: RoundState };
   sound: boolean;
+  secretsLeft: number;
+  onContinue: () => void;
   onReview: () => void;
   onExit: () => void;
   onRetry: () => void;
@@ -655,7 +751,7 @@ function ClearDialog({
         <div className={styles.rewardRow}>
           <span>まちがい・ヒント・時間</span>
           <b>
-            {round.misses}回・{Object.values(round.hints).flat().length}回・{seconds}秒
+            {round.misses}回・{hintCount(round, stage)}回・{seconds}秒
           </b>
         </div>
         {reward.levelUps.map((up) => (
@@ -682,9 +778,20 @@ function ClearDialog({
           <div className={styles.expFill} style={{ transform: `scaleX(${Math.min(1, save.exp / expToNext(save.level))})` }} />
         </div>
       </div>
-      <button type="button" className={`${styles.primary} ${styles.bigButton}`} onClick={onReview}>
-        答えと解説を見る
-      </button>
+      {secretsLeft > 0 ? (
+        <>
+          <button type="button" className={`${styles.primary} ${styles.bigButton} ${styles.okButton}`} onClick={onContinue}>
+            🔒 シークレットをさがす<small>あと{secretsLeft}個・クリアのあともつづけられる</small>
+          </button>
+          <button type="button" className={styles.secondary} style={{ width: "100%", marginTop: 8 }} onClick={onReview}>
+            答えと解説を見る
+          </button>
+        </>
+      ) : (
+        <button type="button" className={`${styles.primary} ${styles.bigButton}`} onClick={onReview}>
+          答えと解説を見る
+        </button>
+      )}
       <div className={styles.actions}>
         <button type="button" className={styles.secondary} onClick={onRetry}>
           もう一度

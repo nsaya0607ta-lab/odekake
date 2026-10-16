@@ -416,6 +416,85 @@
   font-weight: 900;
 }
 
+.slot[data-secret="true"] {
+  border-style: dashed;
+  border-color: color-mix(in srgb, var(--ai) 45%, var(--card-edge));
+}
+.slot[data-secret="true"][data-found="false"] {
+  font-size: 16px;
+  background: repeating-linear-gradient(135deg, transparent 0 6px, color-mix(in srgb, var(--ai) 8%, transparent) 6px 12px), var(--card);
+}
+.slot[data-secret="true"][data-found="true"] {
+  color: var(--ai);
+  background: color-mix(in srgb, var(--ai) 9%, var(--card));
+}
+.mainSlots .slot {
+  font-size: 38px;
+}
+.mainSlots .slot[data-found="false"] {
+  font-size: 22px;
+}
+.slotGrade {
+  position: absolute;
+  top: -5px;
+  right: -4px;
+  padding: 1px 4px;
+  border-radius: 6px;
+  background: var(--matsu);
+  color: var(--card);
+  font-size: 8px;
+  font-weight: 900;
+  font-family: system-ui, sans-serif;
+}
+.clearBadge {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--shu);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 900;
+}
+.secretBox {
+  margin-top: 12px;
+  padding: 10px 10px 12px;
+  border-radius: 18px;
+  border: 1px dashed color-mix(in srgb, var(--ai) 45%, var(--card-edge));
+  background: color-mix(in srgb, var(--ai-soft) 45%, transparent);
+}
+.secretBox .slots {
+  margin-top: 8px;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 6px;
+}
+.secretBox .slot {
+  font-size: clamp(18px, 6vw, 26px);
+  border-radius: 12px;
+}
+.secretHead {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 900;
+  color: var(--ai);
+}
+.secretHead small {
+  flex: 1;
+  font-size: 10px;
+  font-weight: 800;
+  color: var(--ink-faint);
+}
+.secretHead b {
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+}
+.secretNote {
+  margin-top: 8px;
+  font-size: 10.5px;
+  font-weight: 800;
+  color: var(--ink-faint);
+}
+
 .feedback {
   min-height: 40px;
   margin-top: 10px;
@@ -853,6 +932,7 @@
 .bigButton {
   width: 100%;
   height: 60px;
+  white-space: nowrap;
   margin-top: 16px;
   font-size: 19px !important;
 }

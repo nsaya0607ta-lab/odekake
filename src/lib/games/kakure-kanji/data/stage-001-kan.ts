@@ -11,13 +11,16 @@ import type { Stage } from "../types";
  *
  * 字源の確認: 感 = 咸（音）+ 心（意味）。咸 = 戌 + 口。戌 = 戊 + 一（中の横画）。
  * 戊 = 厂の形 + 戈の形。弋 = 戈 から ノ（8画目）をのぞいた形。
+ *
+ * 見つける字（小学校で習う字）は 一（1年）・口（1年）・心（2年）の3つ。
+ * 咸・戈・戌・戊・厂・弋 は小学校で習わない（常用漢字でもない）ので、シークレット枠。
  */
 export const STAGE_001_KAN: Stage = {
   id: "s001-kan",
   number: 1,
   kanji: "感",
   reading: "カン",
-  difficulty: "上級",
+  difficulty: "初級",
   structure: "上の「咸（カン）」と下の「心（こころ）」でできている。咸はさらに「戌（いぬ）」と「口（くち）」に分けられる。",
   strokes: [
     { id: 1, kind: "横", d: "M23 22 C40 21 60 19 79 17.5", width: 5.2 },
@@ -43,6 +46,7 @@ export const STAGE_001_KAN: Stage = {
       strokeSets: [[10, 11, 12, 13]],
       evidence: "下半分の部品（10〜13画目）がそのまま「心」。感は「咸」と「心」を上下に組み合わせた字。",
       tier: 1,
+      grade: 2,
       partHint: "下のほうにある部品だよ",
       verification: { status: "verified", note: "字源（咸+心）と筆画の種類・数（点・臥鉤・点・点の4画）を照合" },
     },
@@ -54,6 +58,7 @@ export const STAGE_001_KAN: Stage = {
       strokeSets: [[4, 5, 6]],
       evidence: "咸の中にある四角（4〜6画目）がそのまま「口」。縦・横折・横の3画で、形も書き順も同じ。",
       tier: 1,
+      grade: 1,
       partHint: "まんなかの四角い部品だよ",
       verification: { status: "verified", note: "縦・横折・横の3画を照合。カタカナのロとは区別する" },
     },
@@ -65,6 +70,7 @@ export const STAGE_001_KAN: Stage = {
       strokeSets: [[1], [3], [6]],
       evidence: "横画を1本だけ取り出すと「一」。上の長い横画（1画目）、中の短い横画（3画目）、口の底（6画目）のどれでもよい。",
       tier: 1,
+      grade: 1,
       partHint: "線を1本だけ取り出すよ",
       verification: { status: "verified", note: "単独の横画（1・3・6画目）。長音記号「ー」とは区別する" },
     },
@@ -76,6 +82,7 @@ export const STAGE_001_KAN: Stage = {
       strokeSets: [[1, 2, 3, 4, 5, 6, 7, 8, 9]],
       evidence: "上半分の部品（1〜9画目）がそのまま「咸」。感の音読み「カン」はこの部品から来ている。",
       tier: 2,
+      grade: null,
       rare: true,
       partHint: "上半分を全部使うよ（音読みは感と同じ）",
       verification: { status: "verified", note: "字源（感=咸+心）。9画の種類と並びを照合" },
@@ -88,6 +95,7 @@ export const STAGE_001_KAN: Stage = {
       strokeSets: [[1, 7, 8, 9]],
       evidence: "上の横画（1画目）・長いはね（7画目）・交わるノ（8画目）・右上の点（9画目）で「戈」。咸の右側は戈の形をしている。",
       tier: 2,
+      grade: null,
       partHint: "右上のはね・ノ・点に、上の横画を足すよ",
       verification: { status: "verified", note: "横・斜め鉤・左払い・点の4画。位置関係（点が右上・ノがはねと交わる）も同じ" },
     },
@@ -99,6 +107,7 @@ export const STAGE_001_KAN: Stage = {
       strokeSets: [[1, 2, 3, 7, 8, 9]],
       evidence: "咸から「口」をとった形がそのまま「戌」。咸は戌と口でできている。中の短い横画（3画目）が戌の特徴。",
       tier: 3,
+      grade: null,
       rare: true,
       partHint: "咸から四角い部品をとるよ（十二支の字）",
       verification: { status: "verified", note: "字源（咸=戌+口）。中の画が横画であることを確認（点なら戍で別の字）" },
@@ -111,6 +120,7 @@ export const STAGE_001_KAN: Stage = {
       strokeSets: [[1, 2, 7, 8, 9]],
       evidence: "戌から中の短い横画（3画目）をとると「戊」。厂の形（1・2画目）と戈の形（7〜9画目）でできている。",
       tier: 3,
+      grade: null,
       rare: true,
       partHint: "戌から、中の短い横画をとるよ",
       verification: { status: "verified", note: "横・左払い・斜め鉤・左払い・点の5画。中に画が無いのが戊（横画なら戌、点なら戍）" },
@@ -123,6 +133,7 @@ export const STAGE_001_KAN: Stage = {
       strokeSets: [[1, 2]],
       evidence: "上の横画（1画目）と左の払い（2画目）で「厂」。横画の右側を短く見ると厂の形になる。",
       tier: 3,
+      grade: null,
       rare: true,
       partHint: "左上の、がけのような2画だよ",
       verification: { status: "verified", note: "横・左払いの2画。上に点がつく「广（まだれ）」とは区別する" },
@@ -135,6 +146,7 @@ export const STAGE_001_KAN: Stage = {
       strokeSets: [[1, 7, 9]],
       evidence: "戈から交わるノ（8画目）をとると「弋」。横画・長いはね・右上の点の3画。",
       tier: 3,
+      grade: null,
       rare: true,
       partHint: "戈から、交わるノをとるよ",
       verification: { status: "verified", note: "横・斜め鉤・点の3画。代・式の右側と同じ形" },

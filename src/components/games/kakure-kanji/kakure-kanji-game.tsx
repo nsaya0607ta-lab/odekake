@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { STAGES, findStage } from "@/lib/games/kakure-kanji/data/index";
 import type { Difficulty, Stage } from "@/lib/games/kakure-kanji/types";
-import { orderedAnswers } from "@/lib/games/kakure-kanji/engine";
+import { mainAnswers, secretAnswers } from "@/lib/games/kakure-kanji/engine";
 import {
   ACHIEVEMENTS,
   claimLoginBonus,
@@ -12,6 +12,7 @@ import {
   createKeyValueStore,
   createMemoryStore,
   defaultSave,
+  dropRound,
   expToNext,
   japanDate,
   skipStage,
@@ -118,6 +119,13 @@ export function KakureKanjiGame() {
 
   const stage = screen.name === "play" || screen.name === "review" ? findStage(screen.stageId) : undefined;
 
+  /** ステージを開く。シークレットまで全部見つけたラウンドは終わっているので、新しく始める */
+  const startStage = (id: string) => {
+    const current = readSave();
+    if (current.rounds[id]?.completedAt != null) commit(dropRound(current, id));
+    setScreen({ name: "play", stageId: id });
+  };
+
   return (
     <div ref={rootRef} className={styles.root} data-theme={theme}>
       {!save ? (
@@ -140,19 +148,19 @@ export function KakureKanjiGame() {
           onAchievements={onAchievements}
         />
       ) : screen.name === "review" && stage ? (
-        <ReviewScreen stage={stage} skipped={screen.skipped} onBack={() => setScreen({ name: "stages" })} onPlay={() => setScreen({ name: "play", stageId: stage.id })} />
+        <ReviewScreen stage={stage} skipped={screen.skipped} onBack={() => setScreen({ name: "stages" })} onPlay={() => startStage(stage.id)} />
       ) : screen.name === "stages" ? (
         <StagesScreen
           save={save}
           onBack={() => setScreen({ name: "home" })}
           onPlay={(id) => {
             playSfx("tap", save.settings.sound);
-            setScreen({ name: "play", stageId: id });
+            startStage(id);
           }}
           onReview={(id) => setScreen({ name: "review", stageId: id, skipped: false })}
         />
       ) : (
-        <HomeScreen save={save} onStart={(id) => setScreen({ name: "play", stageId: id })} onStages={() => setScreen({ name: "stages" })} onOverlay={setOverlay} />
+        <HomeScreen save={save} onStart={startStage} onStages={() => setScreen({ name: "stages" })} onOverlay={setOverlay} />
       )}
 
       {overlay === "settings" && save && (
@@ -261,7 +269,6 @@ function HomeScreen({
   onOverlay: (overlay: Overlay) => void;
 }) {
   const next = STAGES.find((s) => save.rounds[s.id]) ?? STAGES.find((s) => !save.stages[s.id]?.clears) ?? STAGES[0];
-  const inProgress = next ? save.rounds[next.id] : undefined;
   const showcase = STAGES[0];
   return (
     <>
@@ -321,7 +328,7 @@ function HomeScreen({
 
           {next && (
             <button type="button" className={`${styles.primary} ${styles.bigButton}`} onClick={() => onStart(next.id)}>
-              {inProgress ? `つづきから（${inProgress.found.length}/${orderedAnswers(next).length}）` : save.stages[next.id]?.clears ? "もう一度あそぶ" : "あそぶ"}
+              {homeLabel(next, save)}
             </button>
           )}
           <div className={styles.menuGrid}>
@@ -342,6 +349,20 @@ function HomeScreen({
       </main>
     </>
   );
+}
+
+function homeLabel(stage: Stage, save: SaveData): string {
+  const round = save.rounds[stage.id];
+  if (round?.completedAt != null) return "もう一度あそぶ";
+  if (round?.clearedAt != null) {
+    const secrets = secretAnswers(stage);
+    return `シークレットをさがす（${secrets.filter((a) => round.found.includes(a.char)).length}/${secrets.length}）`;
+  }
+  if (round) {
+    const mains = mainAnswers(stage);
+    return `つづきから（${mains.filter((a) => round.found.includes(a.char)).length}/${mains.length}）`;
+  }
+  return save.stages[stage.id]?.clears ? "もう一度あそぶ" : "あそぶ";
 }
 
 function StagesScreen({ save, onBack, onPlay, onReview }: { save: SaveData; onBack: () => void; onPlay: (id: string) => void; onReview: (id: string) => void }) {
@@ -387,7 +408,9 @@ function StagesScreen({ save, onBack, onPlay, onReview }: { save: SaveData; onBa
 function StageCard({ stage, save, onPlay, onReview }: { stage: Stage; save: SaveData; onPlay: (id: string) => void; onReview: (id: string) => void }) {
   const record = save.stages[stage.id];
   const round = save.rounds[stage.id];
-  const total = orderedAnswers(stage).length;
+  const total = mainAnswers(stage).length;
+  const secrets = secretAnswers(stage);
+  const secretsEver = record?.secretsFound.length ?? 0;
   return (
     <div className={styles.stageCard}>
       <span className={`${styles.stageThumb} ${styles.mincho}`} aria-hidden="true">
@@ -398,14 +421,18 @@ function StageCard({ stage, save, onPlay, onReview }: { stage: Stage; save: Save
           ステージ{stage.number}「{stage.kanji}」
         </b>
         <span style={{ display: "block", fontSize: 11, fontWeight: 800 }} className={styles.explainText}>
-          かくれている漢字 {total}個{round ? ` ・ ${round.found.length}個見つけた` : ""}
-          {record?.bestScore ? ` ・ ベスト${record.bestScore}点` : ""}
+          見つける字 {total}個{record?.bestScore ? ` ・ ベスト${record.bestScore}点` : ""}
+          {secrets.length > 0 && (
+            <span style={{ display: "block" }}>
+              🔒 シークレット {secretsEver}/{secrets.length}（これまで）
+            </span>
+          )}
         </span>
         <Stars value={record?.bestStars ?? 0} label={`最高 星${record?.bestStars ?? 0}つ`} />
       </span>
       <span style={{ display: "grid", gap: 6 }}>
         <button type="button" className={styles.primary} style={{ height: 40, fontSize: 14, padding: "0 14px" }} onClick={() => onPlay(stage.id)} aria-label={`ステージ${stage.number}「${stage.kanji}」をあそぶ`}>
-          {round ? "つづき" : "あそぶ"}
+          {round?.completedAt != null ? "もう一度" : round?.clearedAt != null ? "さがす" : round ? "つづき" : "あそぶ"}
         </button>
         {record?.clears ? (
           <button type="button" className={styles.secondary} style={{ height: 32, fontSize: 11 }} onClick={() => onReview(stage.id)}>
@@ -418,7 +445,8 @@ function StageCard({ stage, save, onPlay, onReview }: { stage: Stage; save: Save
 }
 
 function ReviewScreen({ stage, skipped, onBack, onPlay }: { stage: Stage; skipped: boolean; onBack: () => void; onPlay: () => void }) {
-  const answers = orderedAnswers(stage);
+  const mains = mainAnswers(stage);
+  const secrets = secretAnswers(stage);
   return (
     <>
       <header className={styles.topbar}>
@@ -438,12 +466,28 @@ function ReviewScreen({ stage, skipped, onBack, onPlay }: { stage: Stage; skippe
               「{stage.kanji}」（{stage.reading}）のつくり
             </h2>
             <p className={styles.explainText}>{stage.structure}</p>
-            <div style={{ marginTop: 8 }}>
-              {answers.map((answer) => (
+            <h3 className={styles.levelHead} style={{ margin: "14px 0 0" }}>
+              見つける字 <small>小学校で習う字（{mains.length}個）</small>
+            </h3>
+            <div>
+              {mains.map((answer) => (
                 <AnswerExplain key={answer.char} stage={stage} answer={answer} />
               ))}
             </div>
           </section>
+          {secrets.length > 0 && (
+            <section className={`${styles.hero} ${styles.secretBox}`} style={{ textAlign: "left", marginTop: 12 }}>
+              <h2 className={styles.secretHead}>
+                <span>🔒 シークレット</span>
+                <small>小学校で習わない、難しい字（{secrets.length}個）</small>
+              </h2>
+              <div>
+                {secrets.map((answer) => (
+                  <AnswerExplain key={answer.char} stage={stage} answer={answer} />
+                ))}
+              </div>
+            </section>
+          )}
           <section className={styles.hero} style={{ textAlign: "left", marginTop: 12 }}>
             <h2 style={{ fontSize: 15, fontWeight: 900 }}>おしいけれど答えにならない字</h2>
             {stage.nearMisses.map((n) => (
@@ -482,7 +526,10 @@ function HowTo() {
         <b>1.</b> まんなかの大きな漢字は、はじめは全部<b>灰色</b>。線をタップすると<b>黒く</b>なります（もう一度タップで灰色にもどる。指をすべらせると、まとめてえらべます）。
       </p>
       <p style={{ marginTop: 8 }}>
-        <b>2.</b> 黒くした線が漢字になったと思ったら <b>OK</b>。合っていれば答えの一覧に入ります。全部見つけるとクリアです。
+        <b>2.</b> 黒くした線が漢字になったと思ったら <b>OK</b>。合っていれば答えの一覧に入ります。<b>小学校で習う字</b>を全部見つけるとクリアです。
+      </p>
+      <p style={{ marginTop: 8 }}>
+        <b>🔒 シークレット</b>：小学校で習わない難しい字は「シークレット」の枠に入っています（いくつあるかは見えます）。クリアには入りませんが、クリアのあともつづけてさがせます。はじめて見つけると墨コインがもらえます。
       </p>
       <p style={{ marginTop: 8 }}>
         <b>答えになる取り出し方</b>

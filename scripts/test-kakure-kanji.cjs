@@ -24,6 +24,7 @@ Module._resolveFilename = function (request, parent, ...rest) {
 const dir = path.join(__dirname, "../src/lib/games/kakure-kanji");
 const { STAGES, ALL_STAGES } = require(`${dir}/data/index.ts`);
 const { STROKE_STRUCTURES, STROKE_COUNTS } = require(`${dir}/data/structures.ts`);
+const { KYOIKU_GRADES } = require(`${dir}/data/grades.ts`);
 const J = require(`${dir}/judge.ts`);
 const E = require(`${dir}/engine.ts`);
 const P = require(`${dir}/progress.ts`);
@@ -38,7 +39,9 @@ const test = (name, fn) => {
 
 const kan = STAGES.find((s) => s.kanji === "感");
 assert.ok(kan, "ステージ「感」がある");
-const ANSWERS = ["心", "口", "一", "咸", "戈", "戌", "戊", "厂", "弋"];
+const MAIN = ["一", "口", "心"]; // 小学校で習う字（クリアに必要）
+const SECRET = ["咸", "戈", "戌", "戊", "厂", "弋"]; // 小学校で習わない字（シークレット）
+const ANSWERS = [...MAIN, ...SECRET];
 const sorted = (list) => [...list].sort();
 const setOf = (ch) => kan.answers.find((a) => a.char === ch).strokeSets[0];
 const judge = (ids, found = []) => J.judgeStrokes(kan, ids, new Set(found));
@@ -102,7 +105,8 @@ test("2. 1本ちがいなら「おしい」をそっと出す", () => {
 test("2. 検証中（pending）の答えは判定に使わない", () => {
   const draft = { ...kan, answers: kan.answers.map((a) => (a.char === "弋" ? { ...a, verification: { status: "pending", note: "" } } : a)) };
   assert.equal(J.judgeStrokes(draft, setOf("弋"), new Set()).kind, "pending");
-  assert.equal(E.totalAnswers(draft), 8);
+  assert.equal(E.totalAnswers(draft), 3);
+  assert.equal(E.secretAnswers(draft).length, 5, "検証中の字はシークレット枠にも出さない");
 });
 
 // ---------- 3. 同じ答えをくり返しても報酬が重ならない ----------
@@ -134,25 +138,39 @@ test("3. クリア報酬は1ラウンドにつき1回だけ", () => {
 });
 
 // ---------- 4. 全正解でクリア ----------
-test("4. 全部見つけるとクリア、1つでも足りなければクリアしない", () => {
-  let round = E.newRound(kan, 0);
-  for (const ch of ANSWERS.slice(0, -1)) {
-    const out = E.submit(kan, round, setOf(ch), 1);
-    assert.equal(out.cleared, false);
-    round = out.round;
-  }
-  const last = E.submit(kan, round, setOf(ANSWERS.at(-1)), 2);
+test("4. 見つける字（小学校で習う字）を全部見つけるとクリア、1つでも足りなければクリアしない", () => {
+  let round = play(E.newRound(kan, 0), [...SECRET, "一", "口"]);
+  assert.equal(round.clearedAt, null, "シークレットはクリアに入らない");
+  const last = E.submit(kan, round, setOf("心"), 2);
   assert.equal(last.cleared, true);
+  assert.equal(last.completed, true, "シークレットを先に全部見つけていれば同時にコンプリート");
   assert.equal(last.round.clearedAt, 2);
-  assert.equal(E.starsFor(last.round), 3);
-  assert.equal(E.submit(kan, last.round, [1, 2], 3).round, last.round, "クリア後の回答は何も変えない");
+  assert.equal(E.starsFor(kan, last.round), 3);
 });
-test("4. ヒントで答えを開いてもクリアでき、その答えは0点・星が下がる", () => {
-  let round = play(E.newRound(kan, 0), ANSWERS.slice(0, -1));
-  round = E.applyHint(kan, round, "弋", "reveal", 2);
+test("4. クリアのあともシークレットはさがせて、全部でコンプリート。そのあとは何も変わらない", () => {
+  let round = play(E.newRound(kan, 0), MAIN, 1);
+  assert.equal(round.clearedAt, 1);
+  assert.equal(round.completedAt, null);
+  const out = E.submit(kan, round, setOf("戈"), 2);
+  assert.equal(out.result.kind, "correct");
+  assert.equal(out.gained.secret, true);
+  assert.equal(out.cleared, false, "クリアは1回だけ");
+  round = play(out.round, SECRET.filter((c) => c !== "戈"), 3);
+  assert.equal(round.completedAt, 3);
+  assert.equal(E.submit(kan, round, [1, 2], 4).round, round, "コンプリート後の回答は何も変えない");
+});
+test("4. ヒントで答えを開いてもクリアでき、その答えは0点・星が下がる。シークレットのヒントは星に関係ない", () => {
+  let round = play(E.newRound(kan, 0), ["一", "口"]);
+  round = E.applyHint(kan, round, "戈", "reading", 1);
+  round = E.applyHint(kan, round, "戈", "strokes", 1);
+  round = E.applyHint(kan, round, "戈", "part", 1);
+  round = E.applyHint(kan, round, "心", "reveal", 2);
   assert.equal(round.clearedAt, 2);
-  assert.equal(E.starsFor(round), 1);
-  assert.equal(E.pointsFor(kan.answers.find((a) => a.char === "弋"), 3, ["reveal"]), 0);
+  assert.equal(E.starsFor(kan, round), 1);
+  assert.equal(E.hintCount(round, kan), 1, "シークレットに使ったヒントは数えない");
+  assert.equal(E.pointsFor(kan.answers.find((a) => a.char === "心"), 3, ["reveal"]), 0);
+  const noMainHint = E.applyHint(kan, play(E.newRound(kan, 0), ["一", "口"]), "戈", "reveal", 1);
+  assert.equal(E.starsFor(kan, play(noMainHint, ["心"], 2)), 3);
 });
 test("4. まちがえても点数は減らず、連続ボーナスが切れるだけ", () => {
   let round = play(E.newRound(kan, 0), ["心"]);
@@ -162,7 +180,30 @@ test("4. まちがえても点数は減らず、連続ボーナスが切れる�
   assert.equal(round.misses, 1);
   assert.equal(round.combo, 0);
   assert.equal(round.history[0].text, "2画");
-  assert.equal(E.starsFor({ ...round, clearedAt: 3 }), 3, "まちがいで星は減らない");
+  assert.equal(E.starsFor(kan, { ...round, clearedAt: 3 }), 3, "まちがいで星は減らない");
+});
+test("4. シークレットをはじめて見つけたときだけ墨コイン。全部で実績", () => {
+  let save = P.defaultSave();
+  let round = play(E.newRound(kan, 0), MAIN, 1);
+  save = P.saveRound(save, round);
+  const cleared = P.completeStage(save, kan, round, 1);
+  save = cleared.save;
+  assert.ok(save.rounds[kan.id], "クリアしてもラウンドは残る（シークレットをさがせる）");
+  let total = 0;
+  for (const ch of SECRET) {
+    const out = E.submit(kan, save.rounds[kan.id], setOf(ch), 2);
+    save = P.saveRound(save, out.round);
+    const rec = P.recordSecret(save, kan, ch, out.gained.points, true, 2);
+    assert.equal(rec.coins, P.SECRET_COINS);
+    total += out.gained.points;
+    save = rec.save;
+    if (ch === SECRET.at(-1)) assert.ok(rec.achievements.includes("all_secrets"));
+  }
+  assert.ok(save.achievements.first_secret);
+  assert.deepEqual(sorted(save.stages[kan.id].secretsFound), sorted(SECRET));
+  assert.equal(save.totalPoints, cleared.reward.score + total);
+  assert.equal(P.recordSecret(save, kan, "戈", 100, true, 3).coins, 0, "2回目からは墨コインなし");
+  assert.equal(P.recordSecret(save, kan, "心", 100, true, 3).coins, 0, "シークレットでない字には何もしない");
 });
 
 // ---------- 5. コイン不足ではヒントを買えない ----------
@@ -267,6 +308,7 @@ test("6. 実績（初めての正解・ノーヒント・全問正解・連続�
     const done = P.completeStage(save, kan, round, 102 + i);
     save = done.save;
     if (i === 0) assert.deepEqual(sorted(done.reward.achievements), sorted(["first_clear", "no_hint", "perfect"]));
+    save = P.dropRound(save, kan.id);
     if (i === 2) assert.deepEqual(done.reward.achievements, ["streak_3"]);
     if (i > 0) assert.equal(done.reward.coins, kan.reward.replayCoins, "2回目からは少なめ");
   }
@@ -391,6 +433,31 @@ test("9. 「感」の部品は正しい場所にある（咸は上、心は下�
       assert.ok(lower.x1 - lower.x0 <= upper.x1 - upper.x0, `横画${upper.id}・${lower.id}で二にならない`);
     }
   }
+});
+
+test("9. 見つける字は小学校で習う字だけ（学年は配当表のとおり）。それ以外はシークレット", () => {
+  for (const stage of ALL_STAGES) {
+    for (const a of stage.answers) {
+      assert.equal(a.grade, KYOIKU_GRADES[a.char] ?? null, `${a.char} の学年`);
+      assert.equal(E.isSecret(a), KYOIKU_GRADES[a.char] === undefined, `${a.char} のシークレット`);
+    }
+    assert.ok(E.mainAnswers(stage).length > 0, "クリアに必要な字が1つ以上ある");
+  }
+  assert.deepEqual(sorted(E.mainAnswers(kan).map((a) => a.char)), sorted(MAIN));
+  assert.deepEqual(sorted(E.secretAnswers(kan).map((a) => a.char)), sorted(SECRET));
+  assert.equal(kan.difficulty, "初級", "見つける字が3個なので初級（2〜3個）");
+});
+test("9. 古い形のセーブデータ（シークレット前）も読める", () => {
+  const old = P.defaultSave();
+  const round = E.newRound(kan, 1);
+  delete round.rewardedAt;
+  delete round.completedAt;
+  old.rounds[kan.id] = round;
+  old.stages[kan.id] = { clears: 1, bestStars: 3, bestScore: 10, firstClearedAt: 1 };
+  const parsed = P.parseSave(JSON.parse(JSON.stringify(old)));
+  assert.ok(parsed);
+  assert.equal(parsed.rounds[kan.id].rewardedAt, null);
+  assert.deepEqual(parsed.stages[kan.id].secretsFound, []);
 });
 
 // ---------- 10. 字形差による誤判定が起きにくい ----------

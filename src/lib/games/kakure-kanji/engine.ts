@@ -37,7 +37,12 @@ export type RoundState = {
   score: number;
   history: InputRecord[];
   startedAt: number;
+  /** 見つける字（小学校で習う字）を全部見つけた時刻。このあともシークレットはさがせる */
   clearedAt: number | null;
+  /** クリアの報酬をわたした時刻（二重にわたさないため） */
+  rewardedAt: number | null;
+  /** シークレットまで全部見つけた時刻。これでラウンドはおしまい */
+  completedAt: number | null;
 };
 
 export const HISTORY_LIMIT = 30;
@@ -55,16 +60,48 @@ export function newRound(stage: Stage, now: number): RoundState {
     history: [],
     startedAt: now,
     clearedAt: null,
+    rewardedAt: null,
+    completedAt: null,
   };
 }
 
-export function totalAnswers(stage: Stage): number {
-  return verifiedAnswers(stage).length;
+/** シークレット枠の字か（小学校で習わない字） */
+export function isSecret(answer: Answer): boolean {
+  return answer.grade === null;
 }
 
+/** クリアに必要な答え（小学校で習う字） */
+export function mainAnswers(stage: Stage): Answer[] {
+  return orderedAnswers(stage).filter((a) => !isSecret(a));
+}
+
+/** シークレット枠の答え（数は画面に出してよい） */
+export function secretAnswers(stage: Stage): Answer[] {
+  return orderedAnswers(stage).filter(isSecret);
+}
+
+/** クリアに必要な数 */
+export function totalAnswers(stage: Stage): number {
+  return mainAnswers(stage).length;
+}
+
+/** 見つける字を全部見つけたか（クリア） */
 export function isCleared(stage: Stage, round: RoundState): boolean {
-  const need = verifiedAnswers(stage).map((a) => a.char);
-  return need.length > 0 && need.every((ch) => round.found.includes(ch));
+  const need = mainAnswers(stage);
+  return need.length > 0 && need.every((a) => round.found.includes(a.char));
+}
+
+/** シークレットまで全部見つけたか */
+export function isCompleted(stage: Stage, round: RoundState): boolean {
+  return verifiedAnswers(stage).every((a) => round.found.includes(a.char));
+}
+
+/** found / revealed から clearedAt・completedAt をつける */
+function markProgress(stage: Stage, round: RoundState, now: number): RoundState {
+  const next = { ...round };
+  if (next.clearedAt === null && isCleared(stage, next)) next.clearedAt = now;
+  if (next.completedAt === null && isCompleted(stage, next)) next.completedAt = now;
+  return next;
 }
 
 /** 答え1つの点数。ヒントを使った答えは半分、開いた答えは0点 */
@@ -79,22 +116,25 @@ export type SubmitOutcome = {
   round: RoundState;
   result: JudgeResult | null;
   /** この回答で見つけた答えと、その点数 */
-  gained: { answer: Answer; points: number } | null;
+  gained: { answer: Answer; points: number; secret: boolean } | null;
+  /** この回答でクリアした（見つける字がそろった） */
   cleared: boolean;
+  /** この回答でシークレットまで全部そろった */
+  completed: boolean;
 };
 
 /** えらんだ筆画で答える */
 export function submit(stage: Stage, round: RoundState, selected: Iterable<number>, now: number): SubmitOutcome {
-  if (round.clearedAt !== null) return { round, result: null, gained: null, cleared: true };
+  if (round.completedAt !== null) return { round, result: null, gained: null, cleared: false, completed: false };
   const picked = normalizeSelection(stage, selected);
   const result = judgeStrokes(stage, picked, new Set(round.found));
-  if (result.kind === "empty") return { round, result, gained: null, cleared: false };
+  if (result.kind === "empty") return { round, result, gained: null, cleared: false, completed: false };
 
   let next: RoundState = { ...round };
   let gained: SubmitOutcome["gained"] = null;
   if (result.kind === "correct") {
     const points = pointsFor(result.answer, round.combo, round.hints[result.answer.char] ?? []);
-    gained = { answer: result.answer, points };
+    gained = { answer: result.answer, points, secret: isSecret(result.answer) };
     next = {
       ...next,
       found: [...round.found, result.answer.char],
@@ -108,14 +148,19 @@ export function submit(stage: Stage, round: RoundState, selected: Iterable<numbe
   }
   const text = result.kind === "correct" || result.kind === "duplicate" ? result.answer.char : `${picked.length}画`;
   next.history = [{ text, kind: result.kind, at: now }, ...round.history].slice(0, HISTORY_LIMIT);
-  const cleared = isCleared(stage, next);
-  if (cleared) next.clearedAt = now;
-  return { round: next, result, gained, cleared };
+  const marked = markProgress(stage, next, now);
+  return {
+    round: marked,
+    result,
+    gained,
+    cleared: round.clearedAt === null && marked.clearedAt !== null,
+    completed: round.completedAt === null && marked.completedAt !== null,
+  };
 }
 
 /** ヒントを使えるか（もう見つけた答え・同じヒントの2回目は使えない） */
 export function canUseHint(round: RoundState, answerChar: string, kind: HintKind): boolean {
-  if (round.clearedAt !== null) return false;
+  if (round.completedAt !== null) return false;
   if (round.found.includes(answerChar)) return false;
   return !(round.hints[answerChar] ?? []).includes(kind);
 }
@@ -126,23 +171,25 @@ export function applyHint(stage: Stage, round: RoundState, answerChar: string, k
   const hints = { ...round.hints, [answerChar]: [...(round.hints[answerChar] ?? []), kind] };
   if (kind !== "reveal") return { ...round, hints };
   const found = [...round.found, answerChar];
-  const next: RoundState = { ...round, hints, found, revealed: [...round.revealed, answerChar], combo: 0 };
-  if (isCleared(stage, next)) next.clearedAt = now;
-  return next;
+  return markProgress(stage, { ...round, hints, found, revealed: [...round.revealed, answerChar], combo: 0 }, now);
 }
 
-export function hintCount(round: RoundState): number {
-  return Object.values(round.hints).reduce((sum, list) => sum + list.length, 0);
+/** ヒントを使った回数。stage をわたすと、見つける字（シークレットでない字）に使った分だけを数える */
+export function hintCount(round: RoundState, stage?: Stage): number {
+  const main = stage ? new Set(mainAnswers(stage).map((a) => a.char)) : null;
+  return Object.entries(round.hints).reduce((sum, [ch, list]) => (main && !main.has(ch) ? sum : sum + list.length), 0);
 }
 
 /**
  * 星の数。まちがいでは減らさない（何度まちがえてもストレスにならないように）。
+ * 見つける字（シークレットでない字）に使ったヒントだけで決める。
  * ★3 ヒントなし / ★2 ヒント2回まで・答えを開いていない / ★1 クリア
  */
-export function starsFor(round: RoundState): 1 | 2 | 3 {
-  const used = hintCount(round);
+export function starsFor(stage: Stage, round: RoundState): 1 | 2 | 3 {
+  const used = hintCount(round, stage);
+  const main = new Set(mainAnswers(stage).map((a) => a.char));
   if (used === 0) return 3;
-  if (used <= 2 && round.revealed.length === 0) return 2;
+  if (used <= 2 && !round.revealed.some((ch) => main.has(ch))) return 2;
   return 1;
 }
 
