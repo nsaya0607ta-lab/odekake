@@ -4,7 +4,7 @@ const ts = require('typescript');
 const source = fs.readFileSync('src/lib/games/town-builder.ts', 'utf8');
 const compiled = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
 const mod = { exports: {} }; new Function('exports', 'module', compiled)(mod.exports, mod);
-const { createTown, decodeTown, indexAt, buildTile, buildLine, lineTiles, getTownStats, advanceTown, upgradeTile, railRoutes, buyParkLot, placeParkPart, removeParkPart, removeParkLot, expandParkLot, buyFacilityPart, removeFacilityPart, lotTiles, recordTownEdit, undoTownEdit, crossingAxis, opens, touchesRoad } = mod.exports;
+const { createTown, decodeTown, indexAt, buildTile, buildLine, lineTiles, getTownStats, advanceTown, upgradeTile, railRoutes, buyParkLot, placeParkPart, removeParkPart, removeParkLot, expandParkLot, buyFacilityPart, removeFacilityPart, lotTiles, recordTownEdit, undoTownEdit, crossingAxis, opens, touchesRoad, roadShape, roadPartProblem, FACILITY_PARTS } = mod.exports;
 const test = (name, fn) => { fn(); console.log(`PASS ${name}`); };
 const build = (town, type, x, y) => buildTile(town, type, x, y).town;
 const empty = () => createTown(false);
@@ -111,7 +111,9 @@ test('new facility equipment enforces compatibility and retains the existing cit
     const next=buyFacilityPart(base,tile,part.id).town;assert.equal(next.money,base.money-part.price);
     assert.deepEqual(decodeTown(JSON.stringify(next)),next);assert.equal(buyFacilityPart(next,tile,part.id).town,next);
     assert.deepEqual(undoTownEdit(next,recordTownEdit(base,next)),base);
-    assert.equal(buyFacilityPart(base,indexAt(9,10),part.id).town,base);
+    assert.equal(buyFacilityPart(base,indexAt(0,0),part.id).town,base);
+    // Since the road parts (2026-10-16) a vending machine can also stand on a sidewalk; the others cannot.
+    assert.equal(buyFacilityPart(base,indexAt(9,10),part.id).town===base,part.id!=='vending');
   }
 });
 
@@ -170,4 +172,31 @@ test('demolishing a level crossing clears the tile and undo brings the crossing 
   const built = buildLine(empty(), 'rail', lineTiles(indexAt(3, 4), indexAt(9, 4))).town, crossing = buildLine(built, 'road', lineTiles(indexAt(6, 1), indexAt(6, 7))).town;
   assert.deepEqual(undoTownEdit(crossing, recordTownEdit(built, crossing)).tiles, built.tiles);
 });
-console.log('35 town simulation checks passed');
+test('road parts go where they make sense: crossings and bus stops on straight roads, stop signs at junctions, mirrors at bends', () => {
+  let t = empty();
+  t = buildLine(t, 'road', lineTiles(indexAt(2, 10), indexAt(10, 10))).town; t = buildLine(t, 'road', lineTiles(indexAt(6, 10), indexAt(6, 14))).town; t = buildLine(t, 'road', lineTiles(indexAt(10, 10), indexAt(10, 6))).town;
+  const straight = indexAt(4, 10), tee = indexAt(6, 10), bend = indexAt(10, 10), end = indexAt(2, 10);
+  assert.deepEqual([straight, tee, bend, end].map(i => roadShape(t.tiles, i).shape), ['straight', 'tee', 'corner', 'end']);
+  const fits = (tile, part) => buyFacilityPart(t, tile, part).town !== t;
+  for (const part of ['crosswalk', 'busStop', 'footbridge']) { assert(fits(straight, part), part); assert(!fits(tee, part) && !fits(bend, part), part); }
+  assert(fits(tee, 'stopSign') && !fits(straight, 'stopSign') && !fits(bend, 'stopSign'));
+  assert(fits(bend, 'mirror') && fits(tee, 'mirror') && !fits(straight, 'mirror'));
+  assert(fits(tee, 'signal') && fits(straight, 'signal') && !fits(bend, 'signal'));
+  assert(fits(straight, 'roadTrees') && fits(bend, 'roadTrees') && !fits(tee, 'roadTrees'));
+  for (const part of ['pole', 'guardrail', 'postbox', 'vending', 'paving', 'light']) for (const tile of [straight, tee, bend, end]) assert(fits(tile, part), `${part} anywhere`);
+  // Parts that cannot share one stretch of pavement, both ways round.
+  const bus = buyFacilityPart(t, straight, 'busStop').town;
+  for (const part of ['crosswalk', 'footbridge', 'signal']) { const r = buyFacilityPart(bus, straight, part); assert.equal(r.town, bus); assert.match(r.message, /バス停/); }
+  const lights = buyFacilityPart(t, tee, 'signal').town; assert.equal(buyFacilityPart(lights, tee, 'stopSign').town, lights);
+  assert.equal(roadPartProblem(t, indexAt(0, 0), 'busStop'), null, 'Only road tiles have shapes');
+  // On a bridge only the lamps and the paving.
+  let river = empty(); const w = river.tiles.findIndex((x, n) => x === 'water' && river.terrain[n - 1] && river.terrain[n + 1]);
+  river = buildLine(river, 'road', lineTiles(w - 2, w + 2)).town;
+  for (const part of FACILITY_PARTS.filter(p => p.kinds.includes('road'))) assert.equal(buyFacilityPart(river, w, part.id).town !== river, part.id === 'light' || part.id === 'paving', part.id);
+  // Every road part survives a save and undoes at its exact price.
+  for (const part of FACILITY_PARTS.filter(p => p.kinds.includes('road'))) {
+    const tile = part.id === 'stopSign' || part.id === 'signal' ? tee : part.id === 'mirror' ? bend : straight, next = buyFacilityPart(t, tile, part.id).town;
+    assert.equal(t.money - next.money, part.price); assert.deepEqual(decodeTown(JSON.stringify(next)), next); assert.deepEqual(undoTownEdit(next, recordTownEdit(t, next)), t);
+  }
+});
+console.log('36 town simulation checks passed');

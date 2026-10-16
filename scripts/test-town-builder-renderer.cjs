@@ -21,9 +21,11 @@ const art = compile('src/lib/games/town-park-art.ts', { './town-paint': paint })
 const motion = compile('src/lib/games/town-park-motion.ts', { './town-paint': paint, './town-figures': figures, './town-park-art': art });
 const paths = compile('src/lib/games/town-park-paths.ts', { './town-builder': game });
 const sidewalks = compile('src/lib/games/town-sidewalks.ts', { './town-builder': game });
-const traffic = compile('src/lib/games/town-traffic.ts', { './town-transport': transport });
-const life = compile('src/lib/games/town-life.ts', { './town-builder': game, './town-paint': paint, './town-transport': transport, './town-figures': figures, './town-park-art': art, './town-park-motion': motion, './town-park-paths': paths, './town-sidewalks': sidewalks });
-const { TownScene, drawTownIcon, drawTownPartIcon, trainAt } = compile('src/lib/games/town-renderer.ts', { './town-builder': game, './town-transport': transport, './town-sprites': sprites, './town-decorations': decorations, './town-building-models': models, './town-paint': paint, './town-environment': environment, './town-sky': sky, './town-life': life, './town-park-art': art, './town-park-paths': paths, './town-park-motion': motion, './town-traffic': traffic });
+const traffic = compile('src/lib/games/town-traffic.ts', { './town-builder': game, './town-transport': transport });
+const roadParts = compile('src/lib/games/town-road-parts.ts', { './town-builder': game });
+const roadArt = compile('src/lib/games/town-road-art.ts', { './town-paint': paint, './town-park-art': art, './town-road-parts': roadParts });
+const life = compile('src/lib/games/town-life.ts', { './town-builder': game, './town-paint': paint, './town-transport': transport, './town-figures': figures, './town-park-art': art, './town-park-motion': motion, './town-park-paths': paths, './town-sidewalks': sidewalks, './town-road-parts': roadParts });
+const { TownScene, drawTownIcon, drawTownPartIcon, trainAt } = compile('src/lib/games/town-renderer.ts', { './town-builder': game, './town-transport': transport, './town-sprites': sprites, './town-decorations': decorations, './town-building-models': models, './town-paint': paint, './town-environment': environment, './town-sky': sky, './town-life': life, './town-park-art': art, './town-park-paths': paths, './town-park-motion': motion, './town-traffic': traffic, './town-road-parts': roadParts, './town-road-art': roadArt });
 const iso = (x, y, z = 0) => ({ x: (x - y) * 32, y: (x + y) * 16 - z });
 const blank = () => ({ ...game.createTown(false), tiles: Array(576).fill('grass'), terrain: Array(576).fill(false), levels: Array(576).fill(0) });
 let passed = 0;
@@ -454,5 +456,50 @@ test('a level crossing rings and lowers its barriers before every train, and no 
     }
   }
   assert(rang > 0 && passes > 0, 'the train never came over the crossing'); assert(waited > 0, 'no car ever waited at the crossing');
+});
+test('road parts never stand on top of each other, keep to the sidewalk and stay on their own tile, in every road shape', () => {
+  const shapes = {
+    straightX: [[[2, 10], [10, 10]]], straightY: [[[6, 6], [6, 14]]], end: [[[6, 10], [10, 10]]],
+    corner: [[[2, 10], [6, 10]], [[6, 10], [6, 14]]], corner2: [[[6, 6], [6, 10]], [[6, 10], [10, 10]]],
+    tee: [[[2, 10], [10, 10]], [[6, 10], [6, 14]]], teeUp: [[[2, 10], [10, 10]], [[6, 6], [6, 10]]], cross: [[[2, 10], [10, 10]], [[6, 6], [6, 14]]],
+  };
+  const all = game.FACILITY_PARTS.filter(p => p.kinds.includes('road')).map(p => p.id);
+  let checked = 0;
+  for (const [name, lines] of Object.entries(shapes)) {
+    let base = { ...blank(), money: 1e7 };
+    for (const [a, b] of lines) base = game.buildLine(base, 'road', game.lineTiles(b[1] * 24 + b[0], a[1] * 24 + a[0])).town;
+    const tile = 10 * 24 + 6;
+    // Every part on its own, then as many together as the road takes, in a few different orders.
+    for (const order of [all, [...all].reverse(), [...all.slice(5), ...all.slice(0, 5)]]) {
+      let town = base;
+      for (const part of order) town = game.buyFacilityPart(town, tile, part).town;
+      for (const defaultLamp of [false, true]) {
+        const layout = roadParts.roadLayout(town, tile, defaultLamp), x = tile % 24, y = Math.floor(tile / 24);
+        const standing = layout.items.filter(i => i.kind !== 'footbridge');
+        for (const item of standing) {
+          assert(item.x > x && item.x < x + 1 && item.y > y && item.y < y + 1, `${name}: ${item.kind} off its tile`);
+          // On the sidewalk: within a quarter tile of an edge, never out on the carriageway.
+          const u = item.x - x, v = item.y - y, edge = Math.min(u, 1 - u, v, 1 - v);
+          if (item.kind !== 'busSign' && item.kind !== 'signal') assert(edge < .2, `${name}: ${item.kind} out in the road (${u.toFixed(2)}, ${v.toFixed(2)})`);
+        }
+        for (let a = 0; a < standing.length; a++) for (let b = a + 1; b < standing.length; b++) {
+          const p = standing[a], q = standing[b], room = p.kind === 'busShelter' || q.kind === 'busShelter' ? .19 : p.kind === 'tree' || q.kind === 'tree' ? .1 : .055;
+          assert(Math.hypot(p.x - q.x, p.y - q.y) >= room, `${name}: ${p.kind} and ${q.kind} on top of each other`);
+          checked++;
+        }
+        for (const [p, q] of layout.rails) assert(Math.min(p.x, q.x) >= x - 1e-9 && Math.max(p.x, q.x) <= x + 1 + 1e-9 && Math.min(p.y, q.y) >= y - 1e-9 && Math.max(p.y, q.y) <= y + 1 + 1e-9, `${name}: guardrail off the tile`);
+      }
+    }
+  }
+  assert(checked > 200);
+  // Painting them all, day and night, from every side.
+  const { c } = recordingContext();
+  for (const [name, lines] of Object.entries(shapes)) {
+    let town = { ...blank(), money: 1e7 };
+    for (const [a, b] of lines) town = game.buildLine(town, 'road', game.lineTiles(a[1] * 24 + a[0], b[1] * 24 + b[0])).town;
+    for (const part of all) town = game.buyFacilityPart(town, 10 * 24 + 6, part).town;
+    for (const night of [false, true]) new TownScene().render(c, 800, 600, town, { ...options, night, camera: undefined }, 0);
+    assert.ok(name);
+  }
 });
 console.log(`${passed} town renderer checks passed`);

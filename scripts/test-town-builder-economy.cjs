@@ -203,16 +203,35 @@ function apiWithSession(session) {
   });
   await test('all compatible facility parts are charged on the correct building only', async () => {
     for (const part of g.FACILITY_PARTS) for (const kind of part.kinds) {
-      let state = await snapshot(), tile = state.town.tiles.indexOf(kind);
-      if (tile < 0) {
+      let state = await snapshot(), tile = state.town.tiles.findIndex((t, i) => t === kind && !g.roadPartProblem(state.town, i, part.id)), stub = false;
+      if (tile < 0 && kind === 'road') {
+        // A short side road makes a T junction for the parts that belong at one.
+        state = await edit(t => g.buildTile(t, 'road', 12, 11)); stub = true;
+        tile = state.town.tiles.findIndex((t, i) => t === kind && !g.roadPartProblem(state.town, i, part.id));
+      } else if (tile < 0) {
         state = await edit(t => g.buildTile(t, kind, 11, 11)); tile = g.indexAt(11, 11);
       }
       const installed = await edit(t => g.buyFacilityPart(t, tile, part.id));
-      assert(installed.town.attachments.find(a => a.tile === tile).parts.includes(part.id));
+      assert(installed.town.attachments.find(a => a.tile === tile).parts.includes(part.id), part.id);
       await action('undo');
-      // Remove temporary test station/factory, keeping land available for the next kind.
-      if (tile === g.indexAt(11, 11)) await action('undo');
+      // Remove temporary test station/factory or side road, keeping land available for the next kind.
+      if (tile === g.indexAt(11, 11) || stub) await action('undo');
     }
+  });
+  await test('a straight road takes every part that fits it at once; forged unknown or excess parts are refused (0146)', async () => {
+    const state = await snapshot(), tile = state.town.tiles.findIndex((t, i) => t === 'road' && g.roadShape(state.town.tiles, i).shape === 'straight');
+    const road = g.FACILITY_PARTS.filter(p => p.kinds.includes('road')).map(p => p.id);
+    const before = state.balance;
+    let last = state;
+    for (const id of road) { const next = g.buyFacilityPart({ ...last.town, money: last.balance }, tile, id); if (next.town.money !== last.balance) last = await edit(() => next); }
+    const parts = last.town.attachments.find(a => a.tile === tile).parts;
+    assert.deepEqual([...parts].sort(), ['crosswalk', 'guardrail', 'light', 'paving', 'pole', 'postbox', 'roadTrees', 'signal', 'vending']);
+    assert.equal(before - last.balance, parts.reduce((sum, id) => sum + g.FACILITY_PARTS.find(p => p.id === id).price, 0));
+    const forged = structuredClone(last.town); forged.attachments.find(a => a.tile === tile).parts.push('rocket');
+    await expectError(() => action('edit', { p_town: forged }), 'INVALID_TOWN');
+    const crowded = structuredClone(last.town); crowded.attachments.find(a => a.tile === tile).parts = road;
+    await expectError(() => action('edit', { p_town: crowded }), 'INVALID_TOWN');
+    while ((await snapshot()).balance !== before) await action('undo');
   });
   await test('my home costs 500 white coins, needs a road and stays unique even against forged saves', async () => {
     const before = await snapshot(), tile = g.indexAt(12, 11);

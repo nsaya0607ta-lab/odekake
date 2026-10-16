@@ -13,7 +13,8 @@ export type ParkPart = "tree" | "flowers" | "bench" | "fountain" | "playground" 
   | "foodCart" | "parasol" | "drinkFountain" | "bandstand"
   | "windmill" | "flowerClock" | "lantern" | "flagPole";
 export type ParkLot = { id: number; x: number; y: number; width: number; height: number; kind: "park" | "plaza"; parts: { tile: number; kind: ParkPart; rotation: number }[] };
-export type FacilityPart = "garden" | "terrace" | "light" | "sign" | "storage" | "greenbelt" | "solar" | "bench" | "vending" | "canopy" | "planter";
+export type FacilityPart = "garden" | "terrace" | "light" | "sign" | "storage" | "greenbelt" | "solar" | "bench" | "vending" | "canopy" | "planter"
+  | "signal" | "crosswalk" | "busStop" | "footbridge" | "roadTrees" | "pole" | "mirror" | "guardrail" | "postbox" | "stopSign" | "paving";
 export type FacilityAttachment = { tile: number; kind: Tile; parts: FacilityPart[] };
 export type Town = { tiles: Tile[]; money: number; day: number; paused: boolean; levels: number[]; terrain: boolean[]; rewards: string[]; parks: ParkLot[]; attachments: FacilityAttachment[] };
 export const PARK_SIZES = [
@@ -78,10 +79,48 @@ export const FACILITY_PARTS: ReadonlyArray<{ id: FacilityPart; title: string; pr
   { id: "greenbelt", title: "緑化帯", price: 140, kinds: ["factory"], info: "近所への影響を和らげる" },
   { id: "solar", title: "太陽光パネル", price: 260, kinds: ["factory"], info: "工場の経済力＋8・維持負担−4" },
   { id: "bench", title: "待合ベンチ", price: 90, kinds: ["station"], info: "ホームに休憩場所を追加" },
-  { id: "vending", title: "自販機", price: 160, kinds: ["shop", "station"], info: "飲み物を買える場所" },
+  { id: "vending", title: "自販機", price: 160, kinds: ["shop", "station", "road"], info: "飲み物を買える場所" },
   { id: "canopy", title: "日よけ", price: 180, kinds: ["house", "shop"], info: "庭先・屋上に日陰をつくる" },
   { id: "planter", title: "プランター", price: 80, kinds: ["house", "shop", "station"], info: "入口に緑を添える" },
+  // Road parts (2026-10-16): they change how cars and people use the road, or simply dress the street.
+  { id: "signal", title: "信号機", price: 240, kinds: ["road"], info: "車も人も青になるのを待って進む" },
+  { id: "crosswalk", title: "横断歩道", price: 60, kinds: ["road"], info: "人がここで道路をわたる。車は人がわたり終えるまで待つ" },
+  { id: "stopSign", title: "一時停止", price: 50, kinds: ["road"], info: "交差点の手前で車が一度止まる" },
+  { id: "busStop", title: "バス停", price: 180, kinds: ["road"], info: "バスが止まり、待っている人が乗りこむ" },
+  { id: "footbridge", title: "歩道橋", price: 420, kinds: ["road"], info: "人が階段をのぼって道路をまたぐ" },
+  { id: "roadTrees", title: "街路樹", price: 120, kinds: ["road"], info: "いちょう並木。秋は黄色く色づく" },
+  { id: "pole", title: "電柱", price: 70, kinds: ["road"], info: "となりの電柱と電線でつながる。小鳥がとまることも" },
+  { id: "mirror", title: "カーブミラー", price: 80, kinds: ["road"], info: "曲がり角やT字路の見通しをよくする" },
+  { id: "guardrail", title: "ガードレール", price: 90, kinds: ["road"], info: "歩道と車道を白い柵で分ける" },
+  { id: "postbox", title: "郵便ポスト", price: 90, kinds: ["road"], info: "手紙を出しに人が立ち寄る" },
+  { id: "paving", title: "石畳", price: 140, kinds: ["road"], info: "道路を石だたみの道にする" },
 ];
+/** Which ways the road on tile `i` carries on (1 left, 2 right, 4 up, 8 down) and the shape that makes. */
+export function roadShape(tiles: readonly Tile[], i: number) {
+  const x = i % MAP_SIZE, y = Math.floor(i / MAP_SIZE), link = (n: number, inside: boolean) => inside && isRoadTile(tiles[n]) && opens(tiles, i, n, "road");
+  const mask = (link(i - 1, x > 0) ? 1 : 0) | (link(i + 1, x < MAP_SIZE - 1) ? 2 : 0) | (link(i - MAP_SIZE, y > 0) ? 4 : 0) | (link(i + MAP_SIZE, y < MAP_SIZE - 1) ? 8 : 0);
+  const arms = (mask & 1) + (mask >> 1 & 1) + (mask >> 2 & 1) + (mask >> 3 & 1);
+  const shape = arms === 4 ? "cross" as const : arms === 3 ? "tee" as const : arms === 2 ? mask === 3 || mask === 12 ? "straight" as const : "corner" as const : arms === 1 ? "end" as const : "none" as const;
+  return { mask, arms, shape, axis: mask & 3 ? "x" as const : mask & 12 ? "y" as const : "x" as const };
+}
+/** Road parts that cannot share one stretch of pavement. */
+const ROAD_CLASHES: readonly (readonly [FacilityPart, FacilityPart])[] = [["footbridge", "busStop"], ["footbridge", "crosswalk"], ["footbridge", "signal"], ["busStop", "crosswalk"], ["busStop", "signal"], ["signal", "stopSign"]];
+/** Why road part `id` cannot go on road tile `tile` as the road is now (its shape, a bridge, a clashing part), or null when it fits. */
+export function roadPartProblem(town: Pick<Town, "tiles" | "terrain" | "attachments">, tile: number, id: FacilityPart): string | null {
+  if (town.tiles[tile] !== "road") return null;
+  const { shape } = roadShape(town.tiles, tile), parts = town.attachments.find(a => a.tile === tile)?.parts ?? [];
+  if ((id === "crosswalk" || id === "busStop" || id === "footbridge") && shape !== "straight") return "まっすぐな道路にだけ置けます";
+  if (id === "signal" && shape !== "straight" && shape !== "tee" && shape !== "cross") return "交差点か、まっすぐな道路に置けます";
+  if (id === "stopSign" && shape !== "tee" && shape !== "cross") return "交差点にだけ置けます";
+  if (id === "mirror" && shape !== "corner" && shape !== "tee") return "曲がり角とT字路に置けます";
+  if (id === "roadTrees" && (shape === "tee" || shape === "cross")) return "交差点には植えられません";
+  if (town.terrain[tile] && id !== "light" && id !== "paving") return "橋の上には置けません";
+  for (const [a, b] of ROAD_CLASHES) {
+    const other = id === a && parts.includes(b) ? b : id === b && parts.includes(a) ? a : null;
+    if (other) return `${FACILITY_PARTS.find(p => p.id === other)!.title}といっしょには置けません`;
+  }
+  return null;
+}
 export type TownStats = {
   population: number; homes: number; shops: number; factories: number; roads: number; rails: number;
   stations: number; parks: number; linkedStations: number; income: number; upkeep: number;
@@ -182,6 +221,7 @@ export function buyFacilityPart(town: Town, tile: number, id: FacilityPart) {
   const part = FACILITY_PARTS.find(p => p.id === id), kind = town.tiles[tile], old = town.attachments.find(a => a.tile === tile);
   if (!part || !kind || !part.kinds.includes(kind)) return { town, message: "この施設には取り付けられません" };
   if (old?.parts.includes(id)) return { town, message: "購入済みです" };
+  const problem = roadPartProblem(town, tile, id); if (problem) return { town, message: problem };
   if (town.money < part.price) return { town, message: "部品を購入する資金が不足しています" };
   const next = { tile, kind, parts: [...(old?.parts ?? []), id] };
   return { town: { ...town, attachments: [...town.attachments.filter(a => a.tile !== tile), next], money: town.money - part.price }, message: `${part.title}を取り付けました −¥${part.price}` };

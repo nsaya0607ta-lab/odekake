@@ -4,7 +4,9 @@ import { clockDials, drawTownDecoration, decorationPickFaces } from "./town-deco
 import { PARK_ART_HEIGHT, PARK_ART_LIGHTS, PARK_ART_SWAY, drawParkArt, parkArtVariant } from "./town-park-art";
 import { tanabataSeason } from "./town-park-motion";
 import { parkGates } from "./town-park-paths";
-import { Traffic, type Vehicle } from "./town-traffic";
+import { Traffic, vehicleLength, type Vehicle } from "./town-traffic";
+import { plusSide, poleWires as wireSpans, roadLayout, signalState, type RoadLayout } from "./town-road-parts";
+import { busShelter, busSign, curveMirror, facesViewer, footbridge, guardrail, poleWires, postBox, roadMarkings, roadPaving, signalLight, signalPost, stopSign, streetTree, utilityPole, vendingMachine, walkLight, wireBird, wirePoint } from "./town-road-art";
 import { TownSprites, type SpriteBounds } from "./town-sprites";
 import { buildingHeight, buildingLevel, buildingVolumes, factoryLayout, facilityLayout, roofFeatures, type FacilityPlacement } from "./town-building-models";
 import { lightGradient, NIGHT_AMBIENT, paintState, resetPaintState, shade, snowy, type TreePalette } from "./town-paint";
@@ -708,23 +710,27 @@ function transport(c: CanvasRenderingContext2D, town: Town, x: number, y: number
   }
   poly(c, outer.map(p => point(p)), kind === "road" ? "#d5d8c2" : "#b6b49a");
   if (kind === "road") {
-    poly(c, transportOutline(mask, .24).map(p => point(p, .15)), "#6c817b");
-    const surface = transportOutline(mask, .24);
-    for (let j = 0; j < 14; j++) { const u = hash(j * 13 + 8), v = hash(j * 7 + 11); if (contains({ x: u, y: v }, surface)) ellipse(c, point({ x: u, y: v }, .18), .45, .25, j % 2 ? "#bdc7ad24" : "#354e4620"); }
-    for (const { dx, dy, bit } of DIRECTIONS) if (mask & bit) for (const side of [-1, 1]) {
+    const surface = transportOutline(mask, .24), parts = town.tiles[i] === "road" ? town.attachments.find(a => a.tile === i)?.parts : undefined;
+    const layout = parts?.some(p => ROAD_MARKING_PARTS.has(p)) ? roadLayout(town, i) : null, paved = Boolean(layout?.paving);
+    poly(c, surface.map(p => point(p, .15)), "#6c817b");
+    if (paved) roadPaving(c, { x, y }, surface, point);
+    else for (let j = 0; j < 14; j++) { const u = hash(j * 13 + 8), v = hash(j * 7 + 11); if (contains({ x: u, y: v }, surface)) ellipse(c, point({ x: u, y: v }, .18), .45, .25, j % 2 ? "#bdc7ad24" : "#354e4620"); }
+    if (!paved) for (const { dx, dy, bit } of DIRECTIONS) if (mask & bit) for (const side of [-1, 1]) {
       for (const t of [.30, .43]) line(c, point({ x: .5 + dx * t + dy * .26 * side, y: .5 + dy * t + dx * .26 * side }, .2), point({ x: .5 + dx * t + dy * .30 * side, y: .5 + dy * t + dx * .30 * side }, .2), "#a2ad975e", .45);
     }
+    if (layout) roadMarkings(c, layout, point);
     const directions = DIRECTIONS.filter(d => mask & d.bit);
-    if (directions.length === 2) {
+    if (directions.length === 2 && !paved) {
       const [a, b] = directions, path = { a: { x: .5 + a!.dx * .5, y: .5 + a!.dy * .5 }, b: { x: .5 + b!.dx * .5, y: .5 + b!.dy * .5 }, curve: Boolean(a!.dx !== -b!.dx || a!.dy !== -b!.dy) };
-      // Dash spacing is shared across tile edges; curves follow the drivable bend.
-      for (let j = 0; j < 5; j++) line(c, point(trackPoint(path, (j + .15) / 5), .25), point(trackPoint(path, (j + .57) / 5), .25), "#e6e4b0", .8);
-    } else {
+      // Dash spacing is shared across tile edges; curves follow the drivable bend. A crossing interrupts the middle dash.
+      for (let j = 0; j < 5; j++) if (!(layout?.crosswalk && j === 2)) line(c, point(trackPoint(path, (j + .15) / 5), .25), point(trackPoint(path, (j + .57) / 5), .25), "#e6e4b0", .8);
+    } else if (directions.length !== 2) {
       for (const { dx, dy } of directions) {
-        for (const t of [.38, .46]) line(c, point({ x: .5 + dx * t, y: .5 + dy * t }, .25), point({ x: .5 + dx * (t + .035), y: .5 + dy * (t + .035) }, .25), "#e6e4b0", .8);
-        if (directions.length >= 3) for (let j = 0; j < 4; j++) {
-          const offset = (j - 1.5) * .095;
-          line(c, point({ x: .5 + dx * .28 + dy * offset, y: .5 + dy * .28 + dx * offset }, .3), point({ x: .5 + dx * .35 + dy * offset, y: .5 + dy * .35 + dx * offset }, .3), "#e2e6d1", 1.6);
+        if (!paved) for (const t of [.38, .46]) line(c, point({ x: .5 + dx * t, y: .5 + dy * t }, .25), point({ x: .5 + dx * (t + .035), y: .5 + dy * (t + .035) }, .25), "#e6e4b0", .8);
+        // Zebra crossings over every arm of a junction: bars along the road, from curb to curb, before the junction box.
+        if (directions.length >= 3) for (let j = 0; j < 6; j++) {
+          const offset = (j - 2.5) * .08, at = (t: number, o: number) => point({ x: .5 + dx * t + dy * o, y: .5 + dy * t + dx * o }, .3);
+          poly(c, [at(.27, offset - .023), at(.37, offset - .023), at(.37, offset + .023), at(.27, offset + .023)], paintState.snow ? "#f4f6f4" : "#e2e6d1");
         }
       }
       if (directions.length === 1) {
@@ -751,6 +757,8 @@ function transport(c: CanvasRenderingContext2D, town: Town, x: number, y: number
     }
   }
 }
+/** Road parts painted on the road surface (the ground layer), not stood on the sidewalk. */
+const ROAD_MARKING_PARTS: ReadonlySet<FacilityPart> = new Set<FacilityPart>(["paving", "crosswalk", "signal", "stopSign"]);
 /** Where the middle car of the train on route `r` is (distance along the route) and which way it runs. */
 export function trainAt(route: TransportRoute, r: number, time: number) {
   const travel = route.length - .68, phase = (time * .45 + r * 4) % (travel * 2 + 4);
@@ -1009,17 +1017,28 @@ function drawTerrain(c: CanvasRenderingContext2D, town: Town, options: SceneOpti
 function drawCar(c: CanvasRenderingContext2D, v: Vehicle, x: number, y: number, z: number, dx: number, dy: number, night: number, lights: boolean) {
   const s = (color: string) => shade(color, night), body = s(v.color), side = s("#64796c"), glass = s("#b8dbd1"), glassSide = s("#6b9397"), roof = s("#e1ecdc");
   const model = v.model;
-  const length = model === "truck" ? .26 : model === "van" ? .25 : model === "kei" ? .19 : .23, width = model === "kei" ? .11 : .12;
-  ellipse(c, iso(x, y, z), length * 22, 2.5, "#29443d44");
-  for (const a of [-length * .3, length * .3]) for (const k of [-1, 1]) { const p = iso(x + dx * a - dy * k * .065, y + dy * a + dx * k * .065, z + 1.2); ellipse(c, p, 1.2, 1.5, s("#35483f")); ellipse(c, p, .45, .6, s("#b9bba4")); }
-  if (model === "truck") {
+  const length = vehicleLength(model), width = model === "bus" ? .145 : model === "kei" ? .11 : .12;
+  ellipse(c, iso(x, y, z), length * 22, model === "bus" ? 3.4 : 2.5, "#29443d44");
+  for (const a of model === "bus" ? [-length * .33, length * .3] : [-length * .3, length * .3]) for (const k of [-1, 1]) { const p = iso(x + dx * a - dy * k * (width / 2 + .005), y + dy * a + dx * k * (width / 2 + .005), z + 1.2); ellipse(c, p, model === "bus" ? 1.5 : 1.2, model === "bus" ? 1.8 : 1.5, s("#35483f")); ellipse(c, p, .5, .65, s("#b9bba4")); }
+  if (model === "bus") {
+    // A city bus: green skirt, cream body, a band of windows, the cooler on the roof and the destination sign at the front.
+    orientedBox(c, x, y, length, width, 3.6, dx, dy, [body, s("#2f6e55"), body], z + .7);
+    orientedBox(c, x, y, length - .004, width - .004, 3.4, dx, dy, [glass, glassSide, roof], z + 4.3);
+    orientedBox(c, x, y, length, width, 1.2, dx, dy, [s("#eef0e8"), s("#c9cec4"), s("#f4f6ef")], z + 7.7);
+    orientedBox(c, x - dx * .04, y - dy * .04, .12, .08, 1.1, dx, dy, [s("#dfe3dc"), s("#b7bdb4"), s("#eef1ea")], z + 8.9);
+    for (const t of [-.12, -.03, .06]) line(c, iso(x + dx * t - dy * width * .5, y + dy * t + dx * width * .5, z + 4.4), iso(x + dx * t - dy * width * .5, y + dy * t + dx * width * .5, z + 7.6), s("#eef0e8"), .7);
+    const sign = iso(x + dx * (length / 2 + .001), y + dy * (length / 2 + .001), z + 7.1);
+    line(c, { x: sign.x - 2.2, y: sign.y }, { x: sign.x + 2.2, y: sign.y }, lights ? "#ffd88a" : s("#3b4442"), 1.2);
+  } else if (model === "truck") {
     orientedBox(c, x + dx * .07, y + dy * .07, .09, width, 5, dx, dy, [body, side, body], z);
     orientedBox(c, x + dx * .07, y + dy * .07, .06, .1, 2, dx, dy, [glass, glassSide, roof], z + 5);
     orientedBox(c, x - dx * .05, y - dy * .05, .15, width + .01, 6.5, dx, dy, [s("#e6e3d4"), s("#9aa79c"), s("#f1efe2")], z + .6);
   } else {
     const h = model === "van" ? 4.5 : model === "kei" ? 3.8 : 4, cab = model === "van" ? .19 : model === "kei" ? .13 : .13;
     orientedBox(c, x, y, length, width, h, dx, dy, [body, side, body], z);
-    orientedBox(c, x - dx * (model === "sedan" ? .015 : .005), y - dy * (model === "sedan" ? .015 : .005), cab, .09, model === "kei" ? 2.8 : 2, dx, dy, [glass, glassSide, roof], z + h);
+    orientedBox(c, x - dx * (model === "sedan" || model === "taxi" ? .015 : .005), y - dy * (model === "sedan" || model === "taxi" ? .015 : .005), cab, .09, model === "kei" ? 2.8 : 2, dx, dy, [glass, glassSide, roof], z + h);
+    // A taxi carries its lamp on the roof, lit when the lights are on.
+    if (model === "taxi") orientedBox(c, x - dx * .015, y - dy * .015, .035, .05, 1.3, dx, dy, lights ? ["#ffe6a1", "#ffd88a", "#fff3cf"] : [s("#f3ead2"), s("#c9c0a4"), s("#fbf5e4")], z + h + 2);
   }
   line(c, iso(x + dx * length * .46 - dy * .05, y + dy * length * .46 + dx * .05, z + 2), iso(x + dx * length * .46 + dy * .05, y + dy * length * .46 - dx * .05, z + 2), s("#ece9d0"), .7);
   if (!lights) return;
@@ -1044,6 +1063,65 @@ function stationClock(x: number, y: number, axis: "x" | "y") {
 function clockHands(c: CanvasRenderingContext2D, minutes: number, at: (angle: number, length: number) => Point, center: Point, color: string, width: number) {
   const minute = minutes % 60 / 60 * Math.PI * 2, hour = (minutes / 60 % 12) / 12 * Math.PI * 2;
   line(c, center, at(hour, .5), color, width * 1.2); line(c, center, at(minute, .78), color, width);
+}
+/**
+ * Scene objects for the parts standing on a road tile: lamps, signals, the bus stop, a footbridge, street trees, a
+ * utility pole, a curve mirror, a post box, a vending machine, stop signs and guardrails. Keys hold everything that
+ * changes the artwork relative to its origin, so identical parts share one cached sprite.
+ */
+function roadObjects(objects: SceneObject[], l: RoadLayout, lampAt: number) {
+  const lift = l.bridge ? 5 : 0, tile = l.tile, rel = (n: number) => n.toFixed(3);
+  const put = (px: number, py: number, depth: number, key: string, bounds: SpriteBounds, paint: SceneObject["paint"], extra: Partial<SceneObject> = {}) => {
+    const origin = iso(px, py);
+    objects.push({
+      x: origin.x, y: origin.y, depth: px + py + depth, key: lift ? `${key}:b` : key, bounds: lift ? { ...bounds, top: bounds.top - lift, height: bounds.height + lift } : bounds,
+      paint: lift ? (c, night, lit) => { c.save(); c.translate(0, -lift); paint(c, night, lit); c.restore(); } : paint, tile, ...extra,
+    });
+  };
+  const across = l.axis === "x" ? "y" as const : "x" as const, straight = l.shape === "straight" || l.shape === "end" || l.shape === "none";
+  for (const item of l.items) {
+    const f = "facing" in item ? `${item.facing.dx},${item.facing.dy}` : "";
+    switch (item.kind) {
+      case "lamp": put(item.x, item.y, .05, "rlamp", { left: -21, top: -33, width: 46, height: 45 }, (c, _night, lit) => lamp(c, item.x, item.y, lit), { lamp: lampAt, emits: true }); break;
+      case "signal": {
+        const key = `signal:${item.arms.map(a => `${rel(a.to.x - item.x)},${rel(a.to.y - item.y)},${a.head.facing.dx},${a.head.facing.dy}`).join("|")}:${item.walks.map(w => `${w.facing.dx},${w.facing.dy}`).join("|")}`;
+        put(item.x, item.y, .1, key, { left: -24, top: -34, width: 48, height: 40 }, c => signalPost(c, item)); break;
+      }
+      case "busShelter": put(item.x, item.y, 0, `shelter:${f}`, { left: -27, top: -24, width: 54, height: 36 }, (c, night) => busShelter(c, item, night), { emits: true }); break;
+      case "busSign": put(item.x, item.y, .02, `busSign:${f}`, { left: -6, top: -24, width: 12, height: 28 }, c => busSign(c, item)); break;
+      case "footbridge":
+        for (const [piece, depth] of [["loStair", .45], ["deckLo", 1], ["deckHi", 1.3], ["hiStair", 1.55], ["rail", 1.75]] as const) {
+          put(l.x, l.y, depth, `footbridge:${l.axis}:${piece}`, { left: -34, top: -32, width: 68, height: 70 }, (c, night) => footbridge(c, l, piece, night), { emits: piece === "rail" });
+        }
+        break;
+      case "tree": {
+        // Anchored half a tile up, like the park trees, so it bends in the wind about its trunk.
+        const origin = iso(item.x - .5, item.y - .5);
+        objects.push({ x: origin.x, y: origin.y, depth: item.x + item.y + .02, key: "street-tree", bounds: { left: -18, top: -20, width: 36, height: 42 }, paint: c => streetTree(c, item), tile, sway: true });
+        break;
+      }
+      case "pole": {
+        const dx = l.x + .5 - item.x, dy = l.y + .5 - item.y;
+        const toRoad = straight ? l.axis === "x" ? { dx: 0, dy: Math.sign(dy) } : { dx: Math.sign(dx), dy: 0 } : Math.abs(dx) > Math.abs(dy) ? { dx: Math.sign(dx), dy: 0 } : { dx: 0, dy: Math.sign(dy) };
+        const lit = item.seed % 2 === 1;
+        put(item.x, item.y, .03, `pole:${across}:${toRoad.dx},${toRoad.dy}:${item.seed % 6}`, { left: -12, top: -44, width: 26, height: 50 }, (c, _night, on) => utilityPole(c, item, across, toRoad, on), lit ? { lamp: lampAt, emits: true } : {});
+        break;
+      }
+      case "mirror": put(item.x, item.y, .03, `mirror:${item.faces.map(m => `${m.dx},${m.dy}`).join("|")}`, { left: -10, top: -24, width: 20, height: 28 }, c => curveMirror(c, item)); break;
+      case "postbox": put(item.x, item.y, .02, `postbox:${f}`, { left: -6, top: -15, width: 13, height: 18 }, c => postBox(c, item)); break;
+      case "vending": put(item.x, item.y, .02, `road-vending:${f}:${tile % 4}`, { left: -16, top: -22, width: 32, height: 32 }, (c, night) => vendingMachine(c, item, tile, night), { emits: true }); break;
+      case "stopSign": put(item.x, item.y, .02, `stop:${f}`, { left: -6, top: -24, width: 12, height: 27 }, c => stopSign(c, item)); break;
+    }
+  }
+  // Guardrails in short pieces, so cars and people sort in front of or behind each piece.
+  for (const [a, b] of l.rails) {
+    const pieces = Math.max(1, Math.ceil(Math.hypot(b!.x - a!.x, b!.y - a!.y) / .26));
+    for (let k = 0; k < pieces; k++) {
+      const p = { x: a!.x + (b!.x - a!.x) * k / pieces, y: a!.y + (b!.y - a!.y) * k / pieces }, q = { x: a!.x + (b!.x - a!.x) * (k + 1) / pieces, y: a!.y + (b!.y - a!.y) * (k + 1) / pieces };
+      const v = iso(q.x - p.x, q.y - p.y);
+      put(p.x, p.y, (q.x - p.x + q.y - p.y) / 2 + .01, `rail:${rel(q.x - p.x)},${rel(q.y - p.y)}`, { left: Math.min(0, v.x) - 3, top: Math.min(0, v.y) - 8, width: Math.abs(v.x) + 6, height: Math.abs(v.y) + 11 }, c => guardrail(c, p, q));
+    }
+  }
 }
 export class TownScene {
   private readonly traffic = new Traffic();
@@ -1071,7 +1149,12 @@ export class TownScene {
   private readonly createCanvas: (() => HTMLCanvasElement) | null;
   private readonly sprites: TownSprites | null;
   private ground: HTMLCanvasElement | null = null;
-  private groundState: { tiles: Tile[]; terrain: boolean[]; grid: boolean; parks: ParkLot[]; look: string } | null = null;
+  private groundState: { tiles: Tile[]; terrain: boolean[]; grid: boolean; parks: ParkLot[]; attachments: Town["attachments"]; look: string } | null = null;
+  /** Road parts of every road tile, as placed for its shape; the wires between utility poles; tiles with traffic lights. */
+  private roadLayouts = new Map<number, RoadLayout>();
+  private wires: { from: Point; to: Point; across: ["x" | "y", "x" | "y"]; depth: number; seed: number }[] = [];
+  private signalLayouts: RoadLayout[] = [];
+  private busStops = "";
   constructor(createCanvas?: () => HTMLCanvasElement) {
     this.life.reduced = this.reducedMotion;
     this.createCanvas = createCanvas ?? (typeof document !== "undefined" ? () => document.createElement("canvas") : null);
@@ -1146,9 +1229,9 @@ export class TownScene {
   private prepareObjects(town: Town) {
     const look = this.look();
     if (this.lastTiles === town.tiles && this.lastLevels === town.levels && this.lastTerrain === town.terrain && this.lastLook === look && this.lastParks === town.parks && this.lastAttachments === town.attachments) return;
-    if (this.lastTiles !== town.tiles) {
+    const tilesChanged = this.lastTiles !== town.tiles;
+    if (tilesChanged) {
       this.roadNeighbours = new Map(town.tiles.flatMap((tile, i) => isRoadTile(tile) ? [[i, neighbours(i % MAP_SIZE, Math.floor(i / MAP_SIZE)).filter(n => isRoadTile(town.tiles[n]) && opens(town.tiles, i, n, "road"))] as const] : []));
-      this.traffic.sync(this.roadNeighbours, tile => isRoadTile(town.tiles[tile]), tile => town.tiles[tile] === "crossing");
       this.crossingTiles = town.tiles.flatMap((tile, i) => tile === "crossing" ? [i] : []);
       for (const tile of [...this.barriers.keys()]) if (!this.crossingTiles.includes(tile)) this.barriers.delete(tile);
     }
@@ -1156,7 +1239,7 @@ export class TownScene {
     const add = (x: number, y: number, depth: number, key: string, bounds: SpriteBounds, paint: SceneObject["paint"], extra: Partial<SceneObject> = {}) => {
       const origin = iso(x, y); objects.push({ x: origin.x, y: origin.y, depth: x + y + depth, key, bounds, paint, tile: y * MAP_SIZE + x, ...extra });
     };
-    const extras = new Map((town.attachments ?? []).map(a => [a.tile, a.parts])), covered = new Set((town.parks ?? []).flatMap(lotTiles));
+    const extras = new Map((town.attachments ?? []).map(a => [a.tile, a.parts])), covered = new Set((town.parks ?? []).flatMap(lotTiles)), layouts = new Map<number, RoadLayout>();
     for (let y = 0; y < MAP_SIZE; y++) for (let x = 0; x < MAP_SIZE; x++) {
       const i = y * MAP_SIZE + x, tile = town.tiles[i]!, level = town.levels[i] || 1;
       if (["house", "shop", "factory", "station", "park", "home"].includes(tile) && !covered.has(i)) {
@@ -1196,15 +1279,10 @@ export class TownScene {
           add(x, y, u + v, `crossing-post:${axis}:${k}`, { left: -34, top: -16, width: 68, height: 40 }, c => crossingPost(c, x, y, axis, gate));
         });
       }
-      if (tile === "road" && (!town.terrain[i] && (x + y) % 7 === 0 || extras.get(i)?.includes("light"))) {
-        const mask = transportMask(town, i, "road"), corner = Boolean(mask & 3) && Boolean(mask & 12), alongX = Boolean(mask & 3);
-        const position = corner ? "corner" : alongX ? "x" : "y", bridge = Boolean(town.terrain[i]), pair = Boolean(extras.get(i)?.includes("light"));
-        add(x, y, 1.3, `lamp:${position}:${bridge}:${pair}`, { left: -40, top: -30, width: 80, height: 82 }, (c, _night, lit) => {
-          c.save(); if (bridge) c.translate(0, -5);
-          lamp(c, x + (corner ? bridge ? .77 : .87 : alongX ? .42 : bridge ? .22 : .86), y + (corner ? bridge ? .77 : .87 : alongX ? bridge ? .22 : .86 : .42), lit);
-          if (pair) lamp(c, x + (corner ? bridge ? .23 : .13 : alongX ? .72 : bridge ? .78 : .14), y + (corner ? bridge ? .23 : .13 : alongX ? bridge ? .78 : .14 : .72), lit);
-          c.restore();
-        }, { lamp: hash(i * 5.3 + 2), emits: true });
+      if (tile === "road") {
+        const layout = roadLayout(town, i, !town.terrain[i] && (x + y) % 7 === 0);
+        layouts.set(i, layout);
+        roadObjects(objects, layout, hash(i * 5.3 + 2));
       }
       if ((tile === "road" || tile === "rail") && town.terrain[i]) add(x, y, 1.4, `bridge:${tile}:${transportMask(town, i, tile)}`, { left: -36, top: -14, width: 72, height: 52 }, c => bridgeRails(c, town, x, y, tile));
     }
@@ -1238,6 +1316,22 @@ export class TownScene {
     if (this.lastTiles && this.lastLevels && this.lastParks && this.lastAttachments && (this.lastTiles !== town.tiles || this.lastLevels !== town.levels || this.lastParks !== town.parks || this.lastAttachments !== town.attachments)) {
       this.life.changed({ ...town, tiles: this.lastTiles, levels: this.lastLevels, parks: this.lastParks, attachments: this.lastAttachments }, town);
     }
+    // Wires hang between the utility poles of neighbouring road tiles, drawn after both poles.
+    this.wires = wireSpans(layouts).map(w => {
+      const a = layouts.get(w.tiles[0])!, b = layouts.get(w.tiles[1])!;
+      return { from: w.from, to: w.to, across: [a.axis === "x" ? "y" : "x", b.axis === "x" ? "y" : "x"] as ["x" | "y", "x" | "y"], depth: Math.max(w.from.x + w.from.y, w.to.x + w.to.y) + .06, seed: w.tiles[0] };
+    });
+    for (const w of this.wires) {
+      const origin = iso(w.from.x, w.from.y), v = iso(w.to.x - w.from.x, w.to.y - w.from.y);
+      objects.push({ x: origin.x, y: origin.y, depth: w.depth, key: `wire:${(w.to.x - w.from.x).toFixed(3)},${(w.to.y - w.from.y).toFixed(3)}:${w.across.join("")}`, bounds: { left: Math.min(0, v.x) - 6, top: Math.min(0, v.y) - 44, width: Math.abs(v.x) + 12, height: Math.abs(v.y) + 30 }, paint: c => poleWires(c, w.from, w.to, w.across[0], w.across[1]), tile: w.seed });
+    }
+    this.roadLayouts = layouts; this.signalLayouts = [...layouts.values()].filter(l => l.signal);
+    const stops = [...layouts.values()].filter(l => l.busWait.length).map(l => l.tile), stopKey = stops.join();
+    if (tilesChanged || stopKey !== this.busStops) {
+      this.busStops = stopKey;
+      this.traffic.sync(this.roadNeighbours, tile => isRoadTile(town.tiles[tile]), tile => town.tiles[tile] === "crossing", new Set(stops));
+    }
+    this.life.setRoadParts(layouts);
     this.objects = objects.sort((a, b) => a.depth - b.depth); this.effects = effects; this.clocks = clocks; this.homes = homes;
     this.lastTiles = town.tiles; this.lastLevels = town.levels; this.lastTerrain = town.terrain; this.lastLook = look;
     this.lastParks = town.parks; this.lastAttachments = town.attachments;
@@ -1248,11 +1342,11 @@ export class TownScene {
       this.ground = this.createCanvas(); this.ground.width = GROUND_BOUNDS.width * 2; this.ground.height = GROUND_BOUNDS.height * 2;
     }
     const previous = this.groundState, look = this.look();
-    if (!previous || previous.tiles !== town.tiles || previous.terrain !== town.terrain || previous.grid !== options.grid || previous.parks !== town.parks || previous.look !== look) {
+    if (!previous || previous.tiles !== town.tiles || previous.terrain !== town.terrain || previous.grid !== options.grid || previous.parks !== town.parks || previous.attachments !== town.attachments || previous.look !== look) {
       const context = this.ground.getContext("2d"); if (!context) { drawTerrain(c, town, options); return; }
       context.setTransform(1, 0, 0, 1, 0, 0); context.clearRect(0, 0, this.ground.width, this.ground.height);
       context.setTransform(2, 0, 0, 2, -GROUND_BOUNDS.left * 2, -GROUND_BOUNDS.top * 2); drawTerrain(context, town, options);
-      this.groundState = { tiles: town.tiles, terrain: town.terrain, grid: options.grid, parks: town.parks, look };
+      this.groundState = { tiles: town.tiles, terrain: town.terrain, grid: options.grid, parks: town.parks, attachments: town.attachments, look };
     }
     c.drawImage(this.ground, GROUND_BOUNDS.left, GROUND_BOUNDS.top, GROUND_BOUNDS.width, GROUND_BOUNDS.height);
   }
@@ -1314,6 +1408,21 @@ export class TownScene {
       this.barriers.set(tile, now + Math.max(-townStep / 1.1, Math.min(townStep / 1.1, target - now)));
     }
     const closed = new Set(this.crossingTiles.filter(tile => this.ringing.has(tile) || (this.barriers.get(tile) ?? 0) > .02));
+    // People cross on the walk light and when no car is coming; at a crossing without lights they let a car
+    // that has waited a while go first. Passengers get on a bus standing at their side of the stop.
+    const armTile = (tile: number, arm: number) => arm === 1 ? tile - 1 : arm === 2 ? tile + 1 : arm === 4 ? tile - MAP_SIZE : arm === 8 ? tile + MAP_SIZE : null;
+    this.life.mayCross = (cross, along) => {
+      const l = this.roadLayouts.get(cross.tile);
+      if (l?.signal) { const state = signalState(l, time); if ((along === "x" ? state.walkX : state.walkY) !== "walk") return false; }
+      const near = armTile(cross.tile, cross.arm);
+      if (this.traffic.occupied(cross.tile, near)) return false;
+      return Boolean(l?.signal) || this.traffic.waiting(cross.tile, near) < 3;
+    };
+    this.life.boarding = new Map(this.traffic.dwelling().flatMap(d => {
+      const l = this.roadLayouts.get(d.tile); if (!l) return [];
+      const ahead = (l.axis === "x" ? d.dx : d.dy) > 0, side = plusSide(l.axis);
+      return [[d.tile, (ahead ? side : -side) as -1 | 1] as const];
+    }));
     if (env) {
       this.life.sync(town, this.roadNeighbours);
       this.life.closed = closed;
@@ -1365,7 +1474,47 @@ export class TownScene {
       moving.push({ x: iso(clock.x, clock.y).x, y: iso(clock.x, clock.y).y, depth: clock.depth, bounds: { left: -40, top: -60, width: 80, height: 70 }, paint });
     }
     const traffic = env ? Math.max(.12, env.traffic) : 1, carLights = env ? env.lightsOn > .35 || env.rain > .55 || env.fog > .5 : options.night;
-    this.traffic.update(step, townStep, traffic, time, tile => !closed.has(tile));
+    // Cars stop for a closed level crossing, a red or yellow light, a stop sign (a full stop first) and people on the crossings in their way.
+    const armOf = (tile: number, n: number) => n === tile - 1 ? 1 : n === tile + 1 ? 2 : n === tile - MAP_SIZE ? 4 : 8;
+    this.traffic.update(step, townStep, traffic, time, (tile, from, v) => {
+      if (closed.has(tile)) return false;
+      const l = this.roadLayouts.get(tile);
+      if (l?.signal && signalState(l, time)[Math.abs(tile - from) === 1 ? "x" : "y"] !== "green") return false;
+      if (l?.stopArms.length && !l.signal && v.halt < .9) return false;
+      const people = this.life.crossing;
+      return !people.size || !(people.has(`${tile}:0`) || people.has(`${tile}:${armOf(tile, from)}`) || people.has(`${tile}:${armOf(tile, v.next)}`));
+    });
+    // The lamps the signals show now, and the walk lights (blinking before they turn red).
+    for (const l of this.signalLayouts) {
+      const state = signalState(l, time), blink = Math.floor(ambient * 3) % 2 === 0;
+      for (const item of l.items) if (item.kind === "signal") {
+        for (const { head } of item.arms) if (facesViewer(head.facing)) {
+          const light = state[head.approach], lamp = light === "green" ? 0 : light === "yellow" ? 1 : 2;
+          add(item.x, item.y, .11, c => signalLight(c, head, lamp, night), { left: -20, top: -40, width: 40, height: 44 });
+        }
+        for (const walk of item.walks) if (facesViewer(walk.facing)) {
+          const shown = walk.approach === "x" ? state.walkX : state.walkY;
+          if (shown !== "flash" || blink) add(item.x, item.y, .11, c => walkLight(c, walk, shown !== "stop", night), { left: -10, top: -26, width: 20, height: 22 });
+        }
+      }
+    }
+    // Sparrows sit on the wires between utility poles, and now and then fly off and come back.
+    if (env && env.night < .35 && env.rain < .3 && env.snow < .5 && !reduced) for (const w of this.wires) {
+      const count = Math.floor(hash(w.seed * 3.7 + 1) * 4);
+      for (let k = 0; k < count; k++) {
+        const seed = w.seed * 7 + k, period = 34 + hash(seed) * 30, phase = (ambient + hash(seed * 1.3) * period) % period;
+        const p = wirePoint(w.from, w.to, w.across[0], w.across[1], Math.floor(hash(seed * 4.3) * 3), .22 + hash(seed * 2.1) * .56);
+        const away = phase - (period - 9), dir = hash(seed * 5.9) < .5 ? -1 : 1;
+        let q = { x: p.x, y: p.y }, flap = 0;
+        if (away > 0) {
+          if (away > 3 && away < 6) continue;
+          const f = away <= 3 ? away / 3 : (9 - away) / 3;
+          q = { x: p.x + dir * 46 * f, y: p.y - 26 * f - 12 * f * f }; flap = ambient + seed;
+        }
+        const facing = hash(seed * 8.1) < .5 ? -1 : 1, hop = away > 0 ? 0 : Math.max(0, Math.sin(ambient * 1.7 + seed) - .96) * 30;
+        moving.push({ x: q.x, y: q.y - hop, depth: p.depth + .07, bounds: { left: -6, top: -6, width: 12, height: 9 }, paint: c => wireBird(c, { x: q.x, y: q.y - hop }, facing, flap, night) });
+      }
+    }
     for (const tile of this.crossingTiles) {
       const x = tile % MAP_SIZE, y = Math.floor(tile / MAP_SIZE), axis = crossingAxis(town.tiles, tile), down = this.barriers.get(tile) ?? 0, ringing = this.ringing.has(tile) || down > .02;
       for (const gate of crossingGates(axis)) {

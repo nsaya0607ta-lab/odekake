@@ -3,6 +3,11 @@
 --    車と人は道路として、列車は線路として通る。踏切は自分の向きにしかつながらない（車が線路ぞいに走ったり、
 --    列車が道路へ曲がったりしない）。向きの決め方は src/lib/games/town-builder.ts の crossingAxis と同じ。
 --    建物の「道路の隣」の判定、人口クエスト、駅をつなぐクエストも踏切を数える。
+-- 2. 道路の部品を11種類ふやす（信号機・横断歩道・一時停止・バス停・歩道橋・街路樹・電柱・カーブミラー・
+--    ガードレール・郵便ポスト・石畳）。自販機は道路にも置けるようにする。価格は src/lib/games/town-builder.ts の
+--    FACILITY_PARTS と同じ。どの形の道路に置けるか（まっすぐな道だけ、交差点だけなど）といっしょに置けない部品は
+--    見た目の決まりなので、これまでの部品と同じくアプリ側で確かめる（1マスに置けるのは多くて9種類で、
+--    1マス11個までの上限はそのまま）。
 begin;
 
 -- The way the railway runs through a level crossing: where the track carries on beside it, else across the road.
@@ -151,6 +156,78 @@ begin
   return v_count;
 end $$;
 revoke all on function public.town_quest_metric(jsonb,text) from public,anon,authenticated;
+
+-- Road parts (2026-10-16); the vending machine also stands on a sidewalk.
+-- The catalog below is shared with src/lib/games/town-builder.ts / town-progression.ts.
+create or replace function public.town_part_catalog()
+returns table(scope text,part text,price integer,layer text,value integer,kinds text[]) language sql immutable set search_path=public as $$
+values
+('park','tree',70,'object',3,array[]::text[]),
+('park','flowers',60,'object',2,array[]::text[]),
+('park','bench',80,'object',2,array[]::text[]),
+('park','fountain',180,'object',3,array[]::text[]),
+('park','playground',240,'object',4,array[]::text[]),
+('park','path',25,'ground',0,array[]::text[]),
+('park','light',90,'object',1,array[]::text[]),
+('park','cherry',130,'object',4,array[]::text[]),
+('park','pine',90,'object',3,array[]::text[]),
+('park','hedge',65,'object',2,array[]::text[]),
+('park','arch',180,'object',4,array[]::text[]),
+('park','swings',220,'object',4,array[]::text[]),
+('park','sandbox',120,'object',3,array[]::text[]),
+('park','picnic',150,'object',3,array[]::text[]),
+('park','gazebo',320,'object',5,array[]::text[]),
+('park','trash',45,'object',1,array[]::text[]),
+('park','bikeRack',100,'object',2,array[]::text[]),
+('park','pond',260,'object',4,array[]::text[]),
+('park','sculpture',210,'object',3,array[]::text[]),
+('park','clock',190,'object',2,array[]::text[]),
+('park','stones',40,'ground',0,array[]::text[]),
+('park','seesaw',160,'object',3,array[]::text[]),
+('park','springRider',110,'object',2,array[]::text[]),
+('park','globe',210,'object',3,array[]::text[]),
+('park','carousel',680,'object',6,array[]::text[]),
+('park','jungleGym',190,'object',3,array[]::text[]),
+('park','splashPad',280,'object',4,array[]::text[]),
+('park','bars',90,'object',2,array[]::text[]),
+('park','basketball',230,'object',3,array[]::text[]),
+('park','maple',140,'object',4,array[]::text[]),
+('park','ginkgo',130,'object',4,array[]::text[]),
+('park','wisteria',360,'object',5,array[]::text[]),
+('park','flowerField',150,'object',3,array[]::text[]),
+('park','bamboo',110,'object',3,array[]::text[]),
+('park','foodCart',320,'object',4,array[]::text[]),
+('park','parasol',140,'object',3,array[]::text[]),
+('park','drinkFountain',60,'object',1,array[]::text[]),
+('park','bandstand',450,'object',5,array[]::text[]),
+('park','windmill',420,'object',5,array[]::text[]),
+('park','flowerClock',300,'object',4,array[]::text[]),
+('park','lantern',120,'object',2,array[]::text[]),
+('park','flagPole',130,'object',2,array[]::text[]),
+('facility','garden',90,'object',0,array['house','shop']::text[]),
+('facility','terrace',220,'object',0,array['house','shop']::text[]),
+('facility','light',70,'object',0,array['house','shop','station','road']::text[]),
+('facility','sign',120,'object',0,array['shop']::text[]),
+('facility','storage',220,'object',0,array['factory']::text[]),
+('facility','greenbelt',140,'object',0,array['factory']::text[]),
+('facility','solar',260,'object',0,array['factory']::text[]),
+('facility','bench',90,'object',0,array['station']::text[]),
+('facility','vending',160,'object',0,array['shop','station','road']::text[]),
+('facility','canopy',180,'object',0,array['house','shop']::text[]),
+('facility','planter',80,'object',0,array['house','shop','station']::text[]),
+('facility','signal',240,'object',0,array['road']::text[]),
+('facility','crosswalk',60,'object',0,array['road']::text[]),
+('facility','stopSign',50,'object',0,array['road']::text[]),
+('facility','busStop',180,'object',0,array['road']::text[]),
+('facility','footbridge',420,'object',0,array['road']::text[]),
+('facility','roadTrees',120,'object',0,array['road']::text[]),
+('facility','pole',70,'object',0,array['road']::text[]),
+('facility','mirror',80,'object',0,array['road']::text[]),
+('facility','guardrail',90,'object',0,array['road']::text[]),
+('facility','postbox',90,'object',0,array['road']::text[]),
+('facility','paving',140,'object',0,array['road']::text[])
+$$;
+revoke all on function public.town_part_catalog() from public,anon,authenticated;
 
 notify pgrst, 'reload schema';
 commit;

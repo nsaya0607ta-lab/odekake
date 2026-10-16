@@ -3,7 +3,8 @@ import { buildLine, buyFacilityPart, buyParkLot, expandParkLot, placeParkPart, r
 
 const tile = z.number().int().min(0).max(575);
 const parkSize = z.enum(["small", "medium", "large"]);
-const facilityPart = z.enum(["garden", "terrace", "light", "sign", "storage", "greenbelt", "solar", "bench", "vending", "canopy", "planter"]);
+const facilityPart = z.enum(["garden", "terrace", "light", "sign", "storage", "greenbelt", "solar", "bench", "vending", "canopy", "planter",
+  "signal", "crosswalk", "busStop", "footbridge", "roadTrees", "pole", "mirror", "guardrail", "postbox", "stopSign", "paving"]);
 const parkPart = z.enum(["tree", "flowers", "bench", "fountain", "playground", "path", "light", "cherry", "pine", "hedge", "pond", "gazebo", "picnic", "swings", "sandbox", "sculpture", "clock", "trash", "bikeRack", "stones", "arch",
   "seesaw", "springRider", "globe", "carousel", "jungleGym", "splashPad", "bars", "basketball", "maple", "ginkgo", "wisteria", "flowerField", "bamboo",
   "foodCart", "parasol", "drinkFountain", "bandstand", "windmill", "flowerClock", "lantern", "flagPole"]);

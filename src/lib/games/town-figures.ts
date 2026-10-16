@@ -13,8 +13,8 @@ export function ellipse(c: CanvasRenderingContext2D, x: number, y: number, rx: n
 export function stroke(c: CanvasRenderingContext2D, ax: number, ay: number, bx: number, by: number, color: string, width: number) {
   c.beginPath(); c.moveTo(ax, ay); c.lineTo(bx, by); c.strokeStyle = color; c.lineWidth = width; c.stroke();
 }
-/** Something held in the hand: a balloon on a string, an ice cream, a cup or a ball. */
-export type Carry = "balloon" | "icecream" | "drink" | "ball";
+/** Something held in the hand: a balloon on a string, an ice cream, a cup, a ball or a letter to post. */
+export type Carry = "balloon" | "icecream" | "drink" | "ball" | "letter";
 export type Look = {
   top: string; bottom: string; hair: string; skin: string; accent: string; umbrella: string; scale: number;
   bag: "none" | "randoseru" | "tote" | "briefcase"; hat: boolean; parasol: boolean; dog: string | null;
@@ -121,6 +121,7 @@ function held(c: CanvasRenderingContext2D, look: Look, hand: Point, base: Point,
   }
   if (look.carry === "drink") { ellipse(c, hand.x, hand.y - .6 * s, .55 * s, .9 * s, n(look.carryColor ?? "#f1ebdc")); ellipse(c, hand.x, hand.y - 1.4 * s, .55 * s, .22 * s, n("#8a5a3c")); return; }
   if (look.carry === "ball") { ellipse(c, hand.x + .3 * s, hand.y - .2 * s, 1 * s, 1 * s, n(look.carryColor ?? "#e9873f")); ellipse(c, hand.x, hand.y - .5 * s, .3 * s, .3 * s, "#ffffff66"); }
+  if (look.carry === "letter") { c.fillStyle = n("#f7f3e8"); c.fillRect(hand.x - .2 * s, hand.y - 1.5 * s, 1.5 * s, 1 * s); stroke(c, hand.x - .2 * s, hand.y - 1.5 * s, hand.x + .55 * s, hand.y - 1 * s, n("#c9bfa9"), .2 * s); }
 }
 
 /** A tiny French bulldog: cream body, grey eye patch and bat ears, like the app's own dog. */

@@ -142,13 +142,14 @@ const GINKGO: Record<string, Palette> = {
   green: ["#4a8a3c", "#6aa64a", "#97c56a"], fresh: ["#79a845", "#9cc95e", "#c8e38a"], turning: ["#9fae35", "#c9c53f", "#e8e07a"], gold: ["#c89418", "#ecbf2d", "#f9e27a"],
 };
 /** Ginkgo: a tall egg of fan-shaped leaves that turns gold and lays a yellow carpet in late autumn. */
-function ginkgo(k: Kit) {
+function ginkgo(k: Kit, base: "stones" | "grate" = "stones") {
   const { at, line, oval, leaf, c } = k, trunk = "#6f5a48";
-  stoneRing(k, .11);
+  if (base === "grate") treeGrate(k); else stoneRing(k, .11);
   const gold = paintState.bare <= .5 && paintState.foliage > .45;
   if (paintState.foliage > .6 || paintState.bare > .1 && paintState.bare < .6) {
-    oval(at(.5, .52, 1.08), 17, 7.4, "#f0cd45b8");
-    for (let j = 0; j < 20; j++) oval(at(.5 + (noise(j * 3) - .5) * .7, .5 + (noise(j * 5) - .5) * .7, 1.12), .9, .5, j % 2 ? "#e5b62c" : "#f7dc69");
+    const spread = base === "grate" ? .45 : .7;
+    oval(at(.5, .52, 1.08), 17 * spread / .7, 7.4 * spread / .7, "#f0cd45b8");
+    for (let j = 0; j < 20; j++) oval(at(.5 + (noise(j * 3) - .5) * spread, .5 + (noise(j * 5) - .5) * spread, 1.12), .9, .5, j % 2 ? "#e5b62c" : "#f7dc69");
   }
   line(at(.5, .5, 1), at(.5, .5, 17), trunk, 2.6); line(at(.5, .5, 1), at(.5, .5, 17), "#8b7560", .7);
   if (paintState.bare > .5) {
@@ -177,6 +178,15 @@ function ginkgo(k: Kit) {
   }
   if (paintState.snow) for (const [z, rx] of [[37, 3.5], [32.5, 6], [27.5, 8]] as const) oval(at(.5, .5, z), rx, 1.6, "#f3f6f9e0");
 }
+/** The square iron grate round a street tree, set into the sidewalk. */
+function treeGrate(k: Kit) {
+  const { poly, line, at } = k, a = .39, b = .61;
+  poly([at(a - .015, a - .015, .9), at(b + .015, a - .015, .9), at(b + .015, b + .015, .9), at(a - .015, b + .015, .9)], "#9d9a8a");
+  poly([at(a, a, 1), at(b, a, 1), at(b, b, 1), at(a, b, 1)], paintState.snow ? "#e8ecef" : "#4f514b");
+  for (let j = 1; j < 4; j++) { const t = a + (b - a) * j / 4; line(at(t, a, 1.05), at(t, b, 1.05), "#777a70", .4); line(at(a, t, 1.05), at(b, t, 1.05), "#777a70", .4); }
+}
+/** A ginkgo of a street avenue, standing in its grate on the sidewalk at world point (x, y). */
+export function streetGinkgo(c: CanvasRenderingContext2D, x: number, y: number) { ginkgo(parkKit(c, x - .5, y - .5), "grate"); }
 /** A clump of bamboo culms with ringed nodes and drooping leaf sprays. */
 function bamboo(k: Kit) {
   const { at, line, oval, c } = k;
