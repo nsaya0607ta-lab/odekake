@@ -20,8 +20,10 @@ const figures = compile('src/lib/games/town-figures.ts', { './town-paint': paint
 const art = compile('src/lib/games/town-park-art.ts', { './town-paint': paint });
 const motion = compile('src/lib/games/town-park-motion.ts', { './town-paint': paint, './town-figures': figures, './town-park-art': art });
 const paths = compile('src/lib/games/town-park-paths.ts', { './town-builder': game });
-const life = compile('src/lib/games/town-life.ts', { './town-builder': game, './town-paint': paint, './town-transport': transport, './town-figures': figures, './town-park-art': art, './town-park-motion': motion, './town-park-paths': paths });
-const { TownScene, drawTownIcon, drawTownPartIcon } = compile('src/lib/games/town-renderer.ts', { './town-builder': game, './town-transport': transport, './town-sprites': sprites, './town-decorations': decorations, './town-building-models': models, './town-paint': paint, './town-environment': environment, './town-sky': sky, './town-life': life, './town-park-art': art, './town-park-paths': paths, './town-park-motion': motion });
+const sidewalks = compile('src/lib/games/town-sidewalks.ts', { './town-builder': game });
+const traffic = compile('src/lib/games/town-traffic.ts', { './town-transport': transport });
+const life = compile('src/lib/games/town-life.ts', { './town-builder': game, './town-paint': paint, './town-transport': transport, './town-figures': figures, './town-park-art': art, './town-park-motion': motion, './town-park-paths': paths, './town-sidewalks': sidewalks });
+const { TownScene, drawTownIcon, drawTownPartIcon, trainAt } = compile('src/lib/games/town-renderer.ts', { './town-builder': game, './town-transport': transport, './town-sprites': sprites, './town-decorations': decorations, './town-building-models': models, './town-paint': paint, './town-environment': environment, './town-sky': sky, './town-life': life, './town-park-art': art, './town-park-paths': paths, './town-park-motion': motion, './town-traffic': traffic });
 const iso = (x, y, z = 0) => ({ x: (x - y) * 32, y: (x + y) * 16 - z });
 const blank = () => ({ ...game.createTown(false), tiles: Array(576).fill('grass'), terrain: Array(576).fill(false), levels: Array(576).fill(0) });
 let passed = 0;
@@ -424,5 +426,33 @@ test('high roof canopies and tilted solar panels select their owner and stay ins
     const p=iso(5+f.u+f.w/2,5+f.v+f.d/2,f.z+(kind==='factory'?2.9:10.7)),scene=new TownScene();
     for(const zoom of [.6,1.4,2.8]){scene.camera={x:195,y:50,zoom};const x=195+p.x*zoom,y=50+p.y*zoom;assert.equal(scene.pickTile(x,y,town),tile,kind+' '+level);const bounds=scene.tileBounds(tile,town);assert(x>=bounds.left&&x<=bounds.right&&y>=bounds.top&&y<=bounds.bottom);}
   }
+});
+test('a level crossing rings and lowers its barriers before every train, and no car is ever on the track with the train', () => {
+  let town = { ...blank(), money: 1e7 };
+  town = game.buildLine(town, 'rail', game.lineTiles(8 * 24 + 3, 8 * 24 + 11)).town;
+  for (const x of [2, 12]) town = game.buildTile(town, 'station', x, 8).town;
+  // A loop of streets that crosses the railway once, so plenty of cars come to the crossing.
+  for (const [a, b] of [[[6, 3], [6, 13]], [[6, 3], [14, 3]], [[14, 3], [14, 13]], [[6, 13], [14, 13]]]) town = game.buildLine(town, 'road', game.lineTiles(a[1] * 24 + a[0], b[1] * 24 + b[0])).town;
+  const tile = 8 * 24 + 6; assert.equal(town.tiles[tile], 'crossing');
+  const routes = game.getTownStats(town.tiles, town.levels, town.parks, town.attachments).routes, { c } = recordingContext(), scene = new TownScene();
+  let rang = 0, passes = 0, waited = 0, last = new Map();
+  for (let frame = 0; frame < 2400; frame++) {
+    scene.render(c, 800, 600, town, { ...options, routes, paused: false }, 1 / 20);
+    const route = scene.trainRoutes[0], stop = scene.crossingStops.find(s => s.tile === tile), { center } = trainAt(route, 0, scene.time);
+    const near = Math.abs(stop.distance - center), down = scene.barriers.get(tile) ?? 0, closed = scene.ringing.has(tile) || down > .02;
+    if (scene.ringing.has(tile)) rang++;
+    // The whole train (three cars, about one tile long) is on the crossing: the barriers are fully down.
+    if (near < .6) { passes++; assert(down > .99, `barrier only ${down.toFixed(2)} down while the train is on the crossing`); }
+    for (const v of scene.traffic.vehicles) {
+      const before = last.get(v);
+      const onCrossing = v.to === tile && v.t >= .6 || v.from === tile && v.t < .4;
+      if (near < .7) assert(!onCrossing, 'a car is on the level crossing while the train passes');
+      // A car only drives past the stop line onto the crossing while it is open.
+      if (before && before.to === tile && v.to === tile && before.t < .6 && v.t >= .6) assert(!closed, 'a car drove onto the crossing while the barriers were down');
+      if (closed && v.to === tile && v.t < .6 && v.t > .45) waited++;
+      last.set(v, { to: v.to, t: v.t });
+    }
+  }
+  assert(rang > 0 && passes > 0, 'the train never came over the crossing'); assert(waited > 0, 'no car ever waited at the crossing');
 });
 console.log(`${passed} town renderer checks passed`);

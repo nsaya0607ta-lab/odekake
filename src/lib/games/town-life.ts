@@ -1,11 +1,12 @@
-import { MAP_SIZE, lotTiles, neighbours, type ParkLot, type ParkPart, type Tile, type Town } from "./town-builder";
+import { MAP_SIZE, isRoadTile, lotTiles, neighbours, type ParkLot, type ParkPart, type Tile, type Town } from "./town-builder";
 import type { TownEnvironment } from "./town-environment";
 import { TAU, drawDog, drawPerson, drawPigeon, ellipse, stroke, type Look, type Point } from "./town-figures";
 import { parkArtVariant } from "./town-park-art";
 import { PAINTED, PART_MOTION, PART_SPOTS, illuminationSeason, motionDepth, motionKit, spotDuration, spotOpen, type PartFrame, type PartState, type Rider, type SpotKind, type Who } from "./town-park-motion";
 import { parkRoute, parkStroll, parkWays, routeLength, type ParkGate, type ParkWays } from "./town-park-paths";
 import { shade } from "./town-paint";
-import { elevationAt, sampleTransportPath } from "./town-transport";
+import { sidewalkRoute, walkways, type Walkways } from "./town-sidewalks";
+import { elevationAt } from "./town-transport";
 
 export { drawDog, drawPerson } from "./town-figures";
 
@@ -197,6 +198,8 @@ export class TownLife {
   private sparks: Spark[] = [];
   private doors: Door[] = [];
   private roads = new Map<number, number[]>();
+  /** The sidewalk network, rebuilt when the roads change. */
+  private walkway: Walkways | null = null;
   private water: number[] = [];
   private parks: ParkLot[] = [];
   private spots = new Map<string, Spot>();
@@ -215,6 +218,8 @@ export class TownLife {
   private env: TownEnvironment | null = null;
   /** Set by the renderer when the viewer prefers reduced motion: decorative turning and splashing stop. */
   reduced = false;
+  /** Level crossings whose barriers are down: people wait before them. Set by the renderer every frame. */
+  closed: ReadonlySet<number> = new Set();
   private blooms: Point[] = [];
   private chimneys: { x: number; y: number; z: number; seed: number }[] = [];
   private tiles: Tile[] | null = null;
@@ -229,14 +234,14 @@ export class TownLife {
   sync(town: Town, roads: Map<number, number[]>) {
     if (this.tiles === town.tiles && this.parkRef === town.parks) return;
     const tilesChanged = this.tiles !== town.tiles;
-    this.tiles = town.tiles; this.parkRef = town.parks; this.roads = roads; this.parks = town.parks.filter(p => p.parts.some(part => part.kind !== "path" && part.kind !== "stones"));
+    this.tiles = town.tiles; this.parkRef = town.parks; this.roads = roads; this.walkway = null; this.parks = town.parks.filter(p => p.parts.some(part => part.kind !== "path" && part.kind !== "stones"));
     this.doors = [];
     this.chimneys = [];
     for (let i = 0; i < town.tiles.length; i++) {
       const kind = town.tiles[i]!;
       if (!["house", "shop", "factory", "station", "home"].includes(kind)) continue;
       const x = i % MAP_SIZE, y = Math.floor(i / MAP_SIZE);
-      const road = neighbours(x, y).find(n => town.tiles[n] === "road");
+      const road = neighbours(x, y).find(n => isRoadTile(town.tiles[n]));
       if (road !== undefined) this.doors.push({ tile: i, kind, road, dx: road % MAP_SIZE - x, dy: Math.floor(road / MAP_SIZE) - y });
       if (kind === "house" && (town.levels[i] || 1) === 1 && hash(i * 1.7) > .45) this.chimneys.push({ x: x + .16 + .48, y: y + .15 + .095, z: 32, seed: i });
       if (kind === "home") this.chimneys.push({ x: x + .63, y: y + .3, z: 47, seed: i });
@@ -634,18 +639,11 @@ export class TownLife {
     const x = d.tile % MAP_SIZE + .5 + d.dx * .4, y = Math.floor(d.tile / MAP_SIZE) + .5 + d.dy * .4;
     return { x, y };
   }
-  private route(from: number, to: number): number[] | null {
-    if (from === to) return [from];
-    const parents = new Map<number, number>([[from, -1]]), queue = [from];
-    for (let q = 0; q < queue.length; q++) {
-      const i = queue[q]!;
-      if (i === to) break;
-      for (const n of this.roads.get(i) ?? []) if (!parents.has(n)) { parents.set(n, i); queue.push(n); }
-    }
-    if (!parents.has(to)) return null;
-    const path: number[] = []; let at = to;
-    while (at >= 0) { path.push(at); at = parents.get(at) ?? -1; }
-    return path.reverse();
+  /** Along the sidewalks from one door to another, crossing at the zebra crossings of junctions. */
+  private sidewalks(from: Door, to: Door) {
+    this.walkway ??= walkways(this.roads, (_tile, arms) => arms >= 3);
+    const route = sidewalkRoute(this.walkway, { road: from.road, side: { dx: -from.dx, dy: -from.dy } }, { road: to.road, side: { dx: -to.dx, dy: -to.dy } });
+    return route && [this.doorPoint(from), ...route, this.doorPoint(to)];
   }
   private look(env: TownEnvironment, kind: Look["kind"], purpose: "work" | "school" | "shop" | "home" | "walk", r = this.random): Look {
     const warm = (env.temperature ?? 18) >= 25 || env.season === "summer", cold = (env.temperature ?? 18) < 11 || env.season === "winter";
@@ -685,20 +683,8 @@ export class TownLife {
     else if (purpose === "shop") { if (r.next() < .5) { from = r.pick(homes.length ? homes : this.doors); to = r.pick(shops.length ? shops : this.doors); } else { from = r.pick(shops.length ? shops : this.doors); to = r.pick(homes.length ? homes : this.doors); } }
     else { from = r.pick(homes.length ? homes : this.doors); to = r.pick(this.doors); }
     if (!from || !to || from.tile === to.tile && purpose !== "walk") return;
-    const path = this.route(from.road, to.road);
-    if (!path) return;
-    const points: Point[] = [this.doorPoint(from)];
-    const side = r.next() < .5 ? 1 : -1;
-    if (path.length === 1) points.push({ x: path[0]! % MAP_SIZE + .5, y: Math.floor(path[0]! / MAP_SIZE) + .5 });
-    else {
-      // Walk on the sidewalk: the road centreline, offset to one side of the direction of travel.
-      const steps = (path.length - 1) * 6;
-      for (let j = 0; j <= steps; j++) {
-        const q = sampleTransportPath(path, j / 6), length = Math.hypot(q.dx, q.dy) || 1;
-        points.push({ x: q.x + q.dy / length * .3 * side, y: q.y - q.dx / length * .3 * side });
-      }
-    }
-    points.push(this.doorPoint(to));
+    const points = this.sidewalks(from, to);
+    if (!points) return;
     const { lengths, total } = polyline(points);
     const speed = (kind === "jogger" ? .55 : kind === "child" ? .3 : kind === "elder" ? .17 : .24) * (.9 + r.next() * .2) * (env.rain > .5 ? 1.15 : 1);
     this.walkers.push({ points, lengths, total, s: 0, speed, look: this.look(env, kind, purpose), seed: Math.floor(r.next() * 1e6), phase: r.next() * TAU });
@@ -745,7 +731,14 @@ export class TownLife {
       if (this.visitors.length < visitors) this.spawnVisitor(env);
       this.spawnClock = (this.walkers.length < walkers * .6 ? .15 : .4) + r.next() * .4;
     }
-    for (const w of this.walkers) { w.s += w.speed * dt; w.phase += dt * (w.look.kind === "jogger" ? 15 : 9.5); }
+    for (const w of this.walkers) {
+      // Wait at a level crossing while the barrier is down.
+      if (this.closed.size) {
+        const here = at(w, w.s), next = at(w, Math.min(w.total, w.s + .22)), tile = Math.floor(next.y) * MAP_SIZE + Math.floor(next.x);
+        if (this.closed.has(tile) && tile !== Math.floor(here.y) * MAP_SIZE + Math.floor(here.x)) continue;
+      }
+      w.s += w.speed * dt; w.phase += dt * (w.look.kind === "jogger" ? 15 : 9.5);
+    }
     this.walkers = this.walkers.filter(w => w.s < w.total);
     for (const v of this.visitors) {
       v.age += dt; v.phase += dt * 9;

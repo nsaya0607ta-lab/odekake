@@ -4,7 +4,7 @@ const ts = require('typescript');
 const source = fs.readFileSync('src/lib/games/town-builder.ts', 'utf8');
 const compiled = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
 const mod = { exports: {} }; new Function('exports', 'module', compiled)(mod.exports, mod);
-const { createTown, decodeTown, indexAt, buildTile, buildLine, lineTiles, getTownStats, advanceTown, upgradeTile, railRoutes, buyParkLot, placeParkPart, removeParkPart, removeParkLot, expandParkLot, buyFacilityPart, removeFacilityPart, lotTiles, recordTownEdit, undoTownEdit } = mod.exports;
+const { createTown, decodeTown, indexAt, buildTile, buildLine, lineTiles, getTownStats, advanceTown, upgradeTile, railRoutes, buyParkLot, placeParkPart, removeParkPart, removeParkLot, expandParkLot, buyFacilityPart, removeFacilityPart, lotTiles, recordTownEdit, undoTownEdit, crossingAxis, opens, touchesRoad } = mod.exports;
 const test = (name, fn) => { fn(); console.log(`PASS ${name}`); };
 const build = (town, type, x, y) => buildTile(town, type, x, y).town;
 const empty = () => createTown(false);
@@ -114,4 +114,60 @@ test('new facility equipment enforces compatibility and retains the existing cit
     assert.equal(buyFacilityPart(base,indexAt(9,10),part.id).town,base);
   }
 });
-console.log('31 town simulation checks passed');
+
+test('a road dragged across a straight railway (or a railway across a road) makes a level crossing that both use', () => {
+  let t = empty(); t = build(t, 'station', 2, 4); t = build(t, 'station', 10, 4); t = buildLine(t, 'rail', lineTiles(indexAt(3, 4), indexAt(9, 4))).town;
+  const before = t.money, crossed = buildLine(t, 'road', lineTiles(indexAt(6, 1), indexAt(6, 7)));
+  t = crossed.town; const i = indexAt(6, 4);
+  assert.equal(t.tiles[i], 'crossing'); assert.equal(before - t.money, 6 * 35 + 90); assert.equal(crossingAxis(t.tiles, i), 'x');
+  const routes = railRoutes(t.tiles); assert.equal(routes.length, 1); assert(routes[0].includes(i));
+  assert(opens(t.tiles, i, i - 1, 'rail') && opens(t.tiles, i, i + 1, 'rail') && !opens(t.tiles, i, i - 24, 'rail'));
+  assert(opens(t.tiles, i, i - 24, 'road') && opens(t.tiles, i, i + 24, 'road') && !opens(t.tiles, i, i + 1, 'road'));
+  assert(touchesRoad(t.tiles, 7, 4) && getTownStats(t.tiles, t.levels, t.parks, t.attachments).upkeep > getTownStats(t.tiles.map((v, n) => n === i ? 'rail' : v), t.levels, t.parks, t.attachments).upkeep);
+  // The other way round: a railway laid across a straight road.
+  let u = empty(); u = buildLine(u, 'road', lineTiles(indexAt(2, 12), indexAt(9, 12))).town; u = build(u, 'station', 5, 9); u = build(u, 'station', 5, 15);
+  const railed = buildLine(u, 'rail', lineTiles(indexAt(5, 10), indexAt(5, 14))).town, j = indexAt(5, 12);
+  assert.equal(railed.tiles[j], 'crossing'); assert.equal(crossingAxis(railed.tiles, j), 'y'); assert.equal(u.money - railed.money, 4 * 55 + 90); assert.equal(railRoutes(railed.tiles).length, 1);
+  assert.deepEqual(decodeTown(JSON.stringify(railed)).tiles, railed.tiles);
+});
+test('level crossings are refused along the line, on bends and junctions, on bridges, and leave the stroke unbuilt', () => {
+  let t = empty(); t = buildLine(t, 'rail', lineTiles(indexAt(3, 4), indexAt(9, 4))).town;
+  // Along the track, onto its end, or with too little money: nothing at all is built.
+  assert.equal(buildLine(t, 'road', lineTiles(indexAt(2, 4), indexAt(10, 4))).town, t);
+  assert.equal(buildTile(t, 'road', 6, 4, 'x').town, t); assert.equal(buildTile(t, 'road', 3, 4).town, t);
+  const poor = { ...t, money: 89 }; assert.equal(buildTile(poor, 'road', 6, 4, 'y').town, poor);
+  // A road may stop on the track and carry on from the other side later.
+  const half = buildLine(t, 'road', lineTiles(indexAt(6, 2), indexAt(6, 4))).town; assert.equal(half.tiles[indexAt(6, 4)], 'crossing');
+  assert.equal(buildLine(half, 'road', lineTiles(indexAt(6, 7), indexAt(6, 5))).town.tiles[indexAt(6, 5)], 'road');
+  // Where the railway branches there is no crossing.
+  const branch = buildLine(t, 'rail', lineTiles(indexAt(6, 5), indexAt(6, 7))).town;
+  assert.equal(buildLine(branch, 'road', lineTiles(indexAt(6, 2), indexAt(6, 4))).town, branch); assert.equal(buildTile(branch, 'road', 6, 4, 'y').town, branch);
+  // A stroke that turns on the track is refused rather than laid along it.
+  let v = empty(); v = buildLine(v, 'rail', lineTiles(indexAt(12, 3), indexAt(12, 9))).town;
+  assert.equal(buildLine(v, 'road', lineTiles(indexAt(10, 6), indexAt(12, 8))).town, v);
+  // Nor on a bridge.
+  const river = empty(), bridge = river.tiles.findIndex((x, n) => x === 'water' && river.terrain[n - 1] && river.terrain[n + 1]);
+  const span = buildLine(river, 'rail', lineTiles(bridge - 1, bridge + 1)).town; assert.equal(span.tiles[bridge], 'rail'); assert.equal(buildTile(span, 'road', bridge % 24, Math.floor(bridge / 24), 'y').town, span);
+});
+test('a crossing joins each line only its own way, so cars never drive along the track nor trains along the road', () => {
+  // Two neighbouring streets across one railway: crossings side by side along the track.
+  let t = empty(); t = build(t, 'station', 2, 8); t = build(t, 'station', 12, 8); t = buildLine(t, 'rail', lineTiles(indexAt(3, 8), indexAt(11, 8))).town;
+  t = buildLine(t, 'road', lineTiles(indexAt(6, 5), indexAt(6, 11))).town; t = buildLine(t, 'road', lineTiles(indexAt(7, 5), indexAt(7, 6))).town;
+  const a = indexAt(6, 8), b = indexAt(7, 8);
+  t = buildLine(t, 'road', lineTiles(indexAt(7, 7), indexAt(7, 11))).town;
+  assert.equal(t.tiles[a], 'crossing'); assert.equal(t.tiles[b], 'crossing');
+  assert(!opens(t.tiles, a, b, 'road') && opens(t.tiles, a, b, 'rail'));
+  assert.equal(railRoutes(t.tiles)[0].filter(n => n === a || n === b).length, 2);
+  // Removing the track beside a crossing keeps its way: the next road laid there does not join it.
+  const cut = build(t, 'bulldoze', 5, 8), road = build(cut, 'road', 5, 8);
+  assert.equal(crossingAxis(road.tiles, a), 'x'); assert(!opens(road.tiles, a, indexAt(5, 8), 'road'));
+});
+test('demolishing a level crossing clears the tile and undo brings the crossing back', () => {
+  let t = empty(); t = buildLine(t, 'rail', lineTiles(indexAt(3, 4), indexAt(9, 4))).town; t = buildLine(t, 'road', lineTiles(indexAt(6, 1), indexAt(6, 7))).town;
+  const i = indexAt(6, 4), removed = build(t, 'bulldoze', 6, 4), edit = recordTownEdit(t, removed);
+  assert.equal(removed.tiles[i], 'grass'); assert.equal(railRoutes(removed.tiles).length, 0);
+  const restored = undoTownEdit(removed, edit); assert.equal(restored.tiles[i], 'crossing'); assert.deepEqual(restored.tiles, t.tiles);
+  const built = buildLine(empty(), 'rail', lineTiles(indexAt(3, 4), indexAt(9, 4))).town, crossing = buildLine(built, 'road', lineTiles(indexAt(6, 1), indexAt(6, 7))).town;
+  assert.deepEqual(undoTownEdit(crossing, recordTownEdit(built, crossing)).tiles, built.tiles);
+});
+console.log('35 town simulation checks passed');

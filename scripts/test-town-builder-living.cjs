@@ -394,4 +394,58 @@ test('park trees are lit with twinkling lights from dusk in December, and a park
   assert.equal(lights('2026-12-15', 13).length, 0, 'Not in the daytime');
   assert.equal(lights('2026-11-15', 19.5).length, 0, 'Not before December');
 });
+const sidewalksModule = load('src/lib/games/town-sidewalks.ts'), trafficModule = load('src/lib/games/town-traffic.ts'), transportModule = load('src/lib/games/town-transport.ts');
+/** Road adjacency like the renderer's: every road tile and its road neighbours. */
+const roadMap = town => new Map(town.tiles.flatMap((t, i) => t === 'road' ? [[i, game.neighbours(i % 24, Math.floor(i / 24)).filter(n => town.tiles[n] === 'road')]] : []));
+function grid() {
+  let town = { ...blank(), money: 1e7 };
+  for (const y of [4, 10, 16]) town = game.buildLine(town, 'road', game.lineTiles(game.indexAt(2, y), game.indexAt(14, y))).town;
+  for (const x of [2, 8, 14]) town = game.buildLine(town, 'road', game.lineTiles(game.indexAt(x, 4), game.indexAt(x, 16))).town;
+  return town;
+}
+test('pedestrians keep to the sidewalks and cross the road only at the zebra crossings of junctions', () => {
+  const town = grid(), roads = roadMap(town), w = sidewalksModule.walkways(roads, (_tile, arms) => arms >= 3);
+  const onRoad = (x, y) => { const tile = Math.floor(y) * 24 + Math.floor(x), u = x % 1, v = y % 1; return roads.has(tile) && Math.abs(u - .5) < .24 && Math.abs(v - .5) < .24 ? tile : -1; };
+  const doors = [[game.indexAt(5, 3), game.indexAt(5, 4)], [game.indexAt(11, 17), game.indexAt(11, 16)], [game.indexAt(1, 12), game.indexAt(2, 12)], [game.indexAt(9, 7), game.indexAt(8, 7)]];
+  for (const [a, ra] of doors) for (const [b, rb] of doors) {
+    if (a === b) continue;
+    const side = (house, road) => ({ dx: house % 24 - road % 24, dy: Math.floor(house / 24) - Math.floor(road / 24) });
+    const route = sidewalksModule.sidewalkRoute(w, { road: ra, side: side(a, ra) }, { road: rb, side: side(b, rb) });
+    assert(route && route.length >= 2, 'Every door can be reached on foot');
+    for (let j = 1; j < route.length; j++) for (let k = 1; k < 10; k++) {
+      const x = route[j - 1].x + (route[j].x - route[j - 1].x) * k / 10, y = route[j - 1].y + (route[j].y - route[j - 1].y) * k / 10, tile = onRoad(x, y);
+      if (tile >= 0) assert(roads.get(tile).length >= 3, `Off the crosswalk at ${x.toFixed(2)},${y.toFixed(2)}`);
+      const u = x % 1, v = y % 1;
+      if (tile >= 0) assert(Math.abs(u - .5) > .25 || Math.abs(v - .5) > .25 || Math.min(Math.abs(u - .2), Math.abs(u - .8), Math.abs(v - .2), Math.abs(v - .8)) < .01, 'Crossing on the zebra line, never through the middle of the junction');
+    }
+  }
+  // A single street with houses on both sides and no junction: people cross it there, since there is no other way.
+  let lane = { ...blank(), money: 1e7 }; lane = game.buildLine(lane, 'road', game.lineTiles(game.indexAt(3, 8), game.indexAt(9, 8))).town;
+  const lw = sidewalksModule.walkways(roadMap(lane), (_tile, arms) => arms >= 3);
+  assert(sidewalksModule.sidewalkRoute(lw, { road: game.indexAt(4, 8), side: { dx: 0, dy: -1 } }, { road: game.indexAt(7, 8), side: { dx: 0, dy: 1 } }));
+});
+test('cars keep their distance, take turns in junctions and never overlap', () => {
+  const town = grid(), roads = roadMap(town), traffic = new trafficModule.Traffic();
+  traffic.sync(roads, tile => town.tiles[tile] === 'road');
+  assert(traffic.vehicles.length >= 10);
+  let progress = 0;
+  for (let j = 0; j < 3000; j++) {
+    const before = traffic.vehicles.map(v => v.t);
+    traffic.update(1 / 30, 1 / 30, 1, j / 30);
+    progress += traffic.vehicles.reduce((sum, v, k) => sum + ((v.t - before[k] + 1) % 1), 0);
+    const poses = traffic.poses();
+    for (let a = 0; a < poses.length; a++) for (let b = a + 1; b < poses.length; b++) assert(Math.hypot(poses[a].x - poses[b].x, poses[a].y - poses[b].y) >= .2, 'Two cars on top of each other');
+    const inJunction = new Map();
+    for (const v of traffic.vehicles) {
+      const tile = v.t >= trafficModule.STOP_LINE ? v.to : v.t < 1 - trafficModule.STOP_LINE ? v.from : -1;
+      if (tile >= 0 && roads.get(tile).length >= 3) { assert(!inJunction.has(tile), 'One car at a time in a junction'); inJunction.set(tile, v); }
+    }
+  }
+  assert(progress / traffic.vehicles.length > 40, 'Cars keep moving instead of jamming');
+  // A red light (the town's gate) holds a car at the stop line.
+  const held = new trafficModule.Traffic(); held.sync(roads, tile => town.tiles[tile] === 'road');
+  for (let j = 0; j < 600; j++) held.update(1 / 30, 1 / 30, 1, j / 30, tile => roads.get(tile).length < 3);
+  for (const v of held.vehicles) if (roads.get(v.to).length >= 3) assert(v.t < trafficModule.STOP_LINE, 'Stopped before the junction');
+  assert.ok(transportModule.sampleTransportPath);
+});
 console.log(`${passed} living town checks passed`);
