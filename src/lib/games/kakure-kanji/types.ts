@@ -15,7 +15,8 @@ export type StrokeKind =
   | "横折鉤" // 𠃌（はね付きの角）
   | "斜め鉤" // 戈の長い斜めのはね
   | "臥鉤" // 心の底の、ねかせたはね
-  | "縦鉤"; // 亅
+  | "縦鉤" // 亅
+  | "縦曲がり"; // 七の2画目（たてにおりて右へまがる）
 
 export type Stroke = {
   /** 書き順の番号（1から） */
@@ -31,8 +32,10 @@ export type Stroke = {
  * 答えの取り出し方。
  * - component: 部品をそのまま取り出す（例：感 → 心）
  * - strokes: 筆画をえらんで取り出す。形と位置関係はそのまま（例：感 → 戈）
+ * - loose: 見立て。線の長さ・比率・曲がりぐあい・はねの有無は問わないが、線の本数・向き（↙か↘か）・
+ *   まがるかどうか・交わる／つく／はなれる・上下左右の位置関係は守る（例：感の2画目と7画目 → 八）
  */
-export type ExtractRule = "component" | "strokes";
+export type ExtractRule = "component" | "strokes" | "loose";
 
 export type Difficulty = "初級" | "中級" | "上級" | "超上級" | "達人";
 

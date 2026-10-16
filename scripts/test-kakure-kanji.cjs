@@ -23,7 +23,7 @@ Module._resolveFilename = function (request, parent, ...rest) {
 
 const dir = path.join(__dirname, "../src/lib/games/kakure-kanji");
 const { STAGES, ALL_STAGES } = require(`${dir}/data/index.ts`);
-const { STROKE_STRUCTURES, STROKE_COUNTS } = require(`${dir}/data/structures.ts`);
+const { STROKE_STRUCTURES, STROKE_COUNTS, LOOSE_KIND_GROUPS } = require(`${dir}/data/structures.ts`);
 const { KYOIKU_GRADES } = require(`${dir}/data/grades.ts`);
 const J = require(`${dir}/judge.ts`);
 const E = require(`${dir}/engine.ts`);
@@ -39,8 +39,8 @@ const test = (name, fn) => {
 
 const kan = STAGES.find((s) => s.kanji === "感");
 assert.ok(kan, "ステージ「感」がある");
-const MAIN = ["一", "口", "心"]; // 小学校で習う字（クリアに必要）
-const SECRET = ["咸", "戈", "戌", "戊", "厂", "弋"]; // 小学校で習わない字（シークレット）
+const MAIN = ["一", "二", "三", "七", "八", "口", "心"]; // 小学校で習う字（クリアに必要）
+const SECRET = ["咸", "戈", "戌", "戊", "厂", "弋", "乂"]; // 小学校で習わない字（シークレット）
 const ANSWERS = [...MAIN, ...SECRET];
 const sorted = (list) => [...list].sort();
 const setOf = (ch) => kan.answers.find((a) => a.char === ch).strokeSets[0];
@@ -105,8 +105,8 @@ test("2. 1本ちがいなら「おしい」をそっと出す", () => {
 test("2. 検証中（pending）の答えは判定に使わない", () => {
   const draft = { ...kan, answers: kan.answers.map((a) => (a.char === "弋" ? { ...a, verification: { status: "pending", note: "" } } : a)) };
   assert.equal(J.judgeStrokes(draft, setOf("弋"), new Set()).kind, "pending");
-  assert.equal(E.totalAnswers(draft), 3);
-  assert.equal(E.secretAnswers(draft).length, 5, "検証中の字はシークレット枠にも出さない");
+  assert.equal(E.totalAnswers(draft), MAIN.length);
+  assert.equal(E.secretAnswers(draft).length, SECRET.length - 1, "検証中の字はシークレット枠にも出さない");
 });
 
 // ---------- 3. 同じ答えをくり返しても報酬が重ならない ----------
@@ -139,7 +139,7 @@ test("3. クリア報酬は1ラウンドにつき1回だけ", () => {
 
 // ---------- 4. 全正解でクリア ----------
 test("4. 見つける字（小学校で習う字）を全部見つけるとクリア、1つでも足りなければクリアしない", () => {
-  let round = play(E.newRound(kan, 0), [...SECRET, "一", "口"]);
+  let round = play(E.newRound(kan, 0), [...SECRET, ...MAIN.filter((c) => c !== "心")]);
   assert.equal(round.clearedAt, null, "シークレットはクリアに入らない");
   const last = E.submit(kan, round, setOf("心"), 2);
   assert.equal(last.cleared, true);
@@ -160,7 +160,7 @@ test("4. クリアのあともシークレットはさがせて、全部でコ�
   assert.equal(E.submit(kan, round, [1, 2], 4).round, round, "コンプリート後の回答は何も変えない");
 });
 test("4. ヒントで答えを開いてもクリアでき、その答えは0点・星が下がる。シークレットのヒントは星に関係ない", () => {
-  let round = play(E.newRound(kan, 0), ["一", "口"]);
+  let round = play(E.newRound(kan, 0), MAIN.filter((c) => c !== "心"));
   round = E.applyHint(kan, round, "戈", "reading", 1);
   round = E.applyHint(kan, round, "戈", "strokes", 1);
   round = E.applyHint(kan, round, "戈", "part", 1);
@@ -169,13 +169,13 @@ test("4. ヒントで答えを開いてもクリアでき、その答えは0点�
   assert.equal(E.starsFor(kan, round), 1);
   assert.equal(E.hintCount(round, kan), 1, "シークレットに使ったヒントは数えない");
   assert.equal(E.pointsFor(kan.answers.find((a) => a.char === "心"), 3, ["reveal"]), 0);
-  const noMainHint = E.applyHint(kan, play(E.newRound(kan, 0), ["一", "口"]), "戈", "reveal", 1);
+  const noMainHint = E.applyHint(kan, play(E.newRound(kan, 0), MAIN.filter((c) => c !== "心")), "戈", "reveal", 1);
   assert.equal(E.starsFor(kan, play(noMainHint, ["心"], 2)), 3);
 });
 test("4. まちがえても点数は減らず、連続ボーナスが切れるだけ", () => {
   let round = play(E.newRound(kan, 0), ["心"]);
   const before = round.score;
-  round = E.submit(kan, round, [1, 3], 2).round;
+  round = E.submit(kan, round, [1, 4], 2).round;
   assert.equal(round.score, before);
   assert.equal(round.misses, 1);
   assert.equal(round.combo, 0);
@@ -331,6 +331,8 @@ test("8. 1万回入力しても履歴は上限までで、時間もかからな�
 
 // ---------- 9. 問題データと正解一覧に矛盾がない ----------
 const multiset = (list) => sorted(list).join(",");
+/** 見立てで同じとみなす画の種類を、グループの代表（いちばん後ろ）にそろえる */
+const looseKind = (kind) => LOOSE_KIND_GROUPS.find((g) => g.includes(kind))?.at(-1) ?? kind;
 const isSubMultiset = (sub, all) => {
   const rest = [...all];
   return sub.every((x) => {
@@ -392,7 +394,8 @@ test("9. 構造データ：答えの筆画えらびが、その字の画の種�
       assert.equal(structure.length, STROKE_COUNTS[a.char], `${a.char} 画数`);
       for (const set of a.strokeSets) {
         const picked = set.map((id) => stage.strokes.find((s) => s.id === id).kind);
-        assert.equal(multiset(picked), multiset(structure), `${a.char} の画 [${set}]`);
+        const kinds = a.rule === "loose" ? (list) => list.map(looseKind) : (list) => list;
+        assert.equal(multiset(kinds(picked)), multiset(kinds(structure)), `${a.char} の画 [${set}]`);
       }
       assert.equal(E.strokeCountOf(a), STROKE_COUNTS[a.char], `${a.char} ヒントの画数`);
     }
@@ -400,11 +403,12 @@ test("9. 構造データ：答えの筆画えらびが、その字の画の種�
 });
 test("9. 似た字の分類が構造データと矛盾しない（画が無い=missing、画はあるが作れない=shape/position）", () => {
   for (const stage of ALL_STAGES) {
-    const all = stage.strokes.map((s) => s.kind);
+    // 見立て（はね・曲がりぐあいのちがいを同じとみなす）でも画が足りないものだけが missing
+    const all = stage.strokes.map((s) => looseKind(s.kind));
     for (const n of stage.nearMisses) {
       const structure = STROKE_STRUCTURES[n.char];
       if (!structure) continue;
-      const formableByKinds = isSubMultiset(structure, all);
+      const formableByKinds = isSubMultiset(structure.map(looseKind), all);
       if (n.category === "missing") assert.equal(formableByKinds, false, `${n.char} は本当に画が足りない`);
       if (n.category === "shape" || n.category === "position") assert.equal(formableByKinds, true, `${n.char} は画の種類だけなら足りている`);
     }
@@ -425,14 +429,44 @@ test("9. 「感」の部品は正しい場所にある（咸は上、心は下�
   assert.ok(kuchi.x0 > kan9.x0 && kuchi.x1 < kan9.x1 && kuchi.y0 > kan9.y0 && kuchi.y1 < kan9.y1, "口は咸の中");
   // 戌・戊を分ける「中の横画（3画目）」は口の上にある（下なら或の形）
   assert.ok(box([3]).y1 < kuchi.y0, "3画目は口の上");
-  // 「二」にならないこと：横画2本を上下に選んでも、下が上より長くならない
-  const horizontals = kan.strokes.filter((s) => s.kind === "横").map((s) => ({ id: s.id, ...box([s.id]) }));
-  for (const upper of horizontals) {
-    for (const lower of horizontals) {
-      if (lower.y0 <= upper.y0) continue;
-      assert.ok(lower.x1 - lower.x0 <= upper.x1 - upper.x0, `横画${upper.id}・${lower.id}で二にならない`);
-    }
-  }
+  // 二・三：横画（1・3・6画目）が上から順にはなれてならび、横の位置が重なっている
+  const [h1, h3, h6] = [box([1]), box([3]), box([6])];
+  assert.ok(h1.y1 < h3.y0 && h3.y1 < h6.y0, "横画は上下にはなれている");
+  assert.ok(Math.max(h1.x0, h3.x0, h6.x0) < Math.min(h1.x1, h3.x1, h6.x1), "横の位置が重なる");
+});
+
+test("9. 見立ての答えは、向き・交わり・位置関係がその字のとおり", () => {
+  const pts = (id) => {
+    const n = kan.strokes.find((s) => s.id === id).d.match(/-?\d+(\.\d+)?/g).map(Number);
+    return n.reduce((list, v, i) => (i % 2 ? [...list.slice(0, -1), { ...list.at(-1), y: v }] : [...list, { x: v, y: 0 }]), []);
+  };
+  const segCross = (a, b, c, d) => {
+    const o = (p, q, r) => Math.sign((q.x - p.x) * (r.y - p.y) - (q.y - p.y) * (r.x - p.x));
+    return o(a, b, c) !== o(a, b, d) && o(c, d, a) !== o(c, d, b);
+  };
+  const cross = (i, j) => {
+    const a = pts(i);
+    const b = pts(j);
+    for (let m = 0; m < a.length - 1; m++) for (let n = 0; n < b.length - 1; n++) if (segCross(a[m], a[m + 1], b[n], b[n + 1])) return true;
+    return false;
+  };
+  /** はじめの点から、いちばん下の点への向き（はねは無視） */
+  const dir = (id) => {
+    const p = pts(id);
+    const low = p.reduce((m, q) => (q.y > m.y ? q : m), p[0]);
+    return low.x < p[0].x ? "↙" : "↘";
+  };
+  // 八：↙が左・↘が右、交わらない
+  assert.equal(dir(2), "↙");
+  assert.equal(dir(7), "↘");
+  assert.ok(!cross(2, 7), "八の2本ははなれている");
+  assert.ok(Math.max(...pts(2).map((q) => q.x)) < Math.min(...pts(7).map((q) => q.x)), "八：↙の画が左");
+  // 乂：↘と↙が交わる
+  assert.equal(dir(8), "↙");
+  assert.ok(cross(7, 8), "乂の2本は交わる");
+  // 七：横画を、右へまがる画が切る
+  assert.ok(cross(1, 7), "七：7画目が1画目を切る");
+  assert.ok(pts(7).at(-2).x - pts(7)[0].x > 20, "七：7画目は右へまがる（十ではない）");
 });
 
 test("9. 見つける字は小学校で習う字だけ（学年は配当表のとおり）。それ以外はシークレット", () => {
@@ -445,7 +479,7 @@ test("9. 見つける字は小学校で習う字だけ（学年は配当表の�
   }
   assert.deepEqual(sorted(E.mainAnswers(kan).map((a) => a.char)), sorted(MAIN));
   assert.deepEqual(sorted(E.secretAnswers(kan).map((a) => a.char)), sorted(SECRET));
-  assert.equal(kan.difficulty, "初級", "見つける字が3個なので初級（2〜3個）");
+  assert.equal(kan.difficulty, "上級", "見つける字が7個なので上級（7〜10個）");
 });
 test("9. 古い形のセーブデータ（シークレット前）も読める", () => {
   const old = P.defaultSave();
@@ -470,13 +504,20 @@ test("10. 戌・戊・戈・弋は、中の横画やノの有無で正しく分�
   assert.equal(judge([1, 2, 9, 7, 8]).answer.char, "戊", "点はもともと戊の右上の点");
   assert.notEqual(judge([1, 2, 10, 7, 8, 9]).kind, "correct", "心の点をまぜても戍にはならない");
 });
-test("10. 二（横画2本）・十・部首だけの形は正解にならない", () => {
-  for (const pair of [[1, 3], [1, 6], [3, 6]]) assert.equal(judge(pair).kind, "wrong", `二 ${pair}`);
+test("10. 見立てで二・三・七・八・乂になり、十・人・部首だけの形は正解にならない", () => {
+  for (const pair of [[1, 3], [1, 6], [3, 6]]) assert.equal(judge(pair).answer.char, "二", `二 ${pair}`);
+  assert.equal(judge([1, 3, 6]).answer.char, "三");
+  assert.equal(judge([1, 7]).answer.char, "七");
+  assert.equal(judge([2, 7]).answer.char, "八");
+  assert.equal(judge([7, 8]).answer.char, "乂");
+  assert.equal(judge([2, 8]).kind, "wrong", "↙と↙では八にならない");
+  assert.equal(judge([10, 13]).kind, "wrong", "心の点（どちらも↘）では八にならない");
+  assert.equal(judge([12, 13]).kind, "wrong", "心の点（どちらも↘）では八にならない");
   for (const one of [2, 4, 9, 10, 11]) assert.equal(judge([one]).kind, "wrong", `部首の形 ${one}`);
   assert.equal(judge([1, 4]).kind, "wrong", "十");
 });
 test("10. どの結果にも画面に出す文があり、undefined が出ない", () => {
-  for (const ids of [setOf("心"), [], kan.strokes.map((s) => s.id), [10, 11, 12], [4, 5, 6, 3], [1, 3]]) {
+  for (const ids of [setOf("心"), [], kan.strokes.map((s) => s.id), [10, 11, 12], [4, 5, 6, 3], [1, 4]]) {
     const msg = J.resultMessage(judge(ids, ["口"]), "感");
     assert.ok(msg && !msg.includes("undefined"), msg);
   }

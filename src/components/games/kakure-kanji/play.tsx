@@ -44,7 +44,7 @@ type Feedback = { tone: "good" | "bad" | "info" | "plain"; text: string; key: nu
 type Flyer = { key: number; char: string; from: DOMRect; to: DOMRect };
 
 const TIER_LABEL = { 1: "やさしい", 2: "ふつう", 3: "むずかしい" } as const;
-const RULE_LABEL = { component: "部品をそのまま取り出す", strokes: "筆画をえらんで取り出す" } as const;
+const RULE_LABEL = { component: "部品をそのまま取り出す", strokes: "筆画をえらんで取り出す", loose: "にた形で見立てる" } as const;
 
 export function PlayScreen({
   stage,
@@ -347,7 +347,7 @@ export function PlayScreen({
             className={`${styles.slots} ${styles.mainSlots}`}
             role="list"
             aria-label="見つける漢字（小学校で習う字）"
-            style={{ gridTemplateColumns: `repeat(${Math.min(5, mains.length)}, minmax(0, 76px))`, justifyContent: "center" }}
+            style={{ gridTemplateColumns: `repeat(${Math.min(7, mains.length)}, minmax(0, 76px))`, justifyContent: "center" }}
           >
             {mains.map((answer, i) => renderSlot(answer, `答え${i + 1}`))}
           </div>
@@ -361,7 +361,7 @@ export function PlayScreen({
                   {foundSecret} / {secrets.length}
                 </b>
               </h2>
-              <div className={styles.slots} role="list">
+              <div className={styles.slots} role="list" style={{ gridTemplateColumns: `repeat(${Math.min(7, secrets.length)}, minmax(0, 1fr))` }}>
                 {secrets.map((answer, i) => renderSlot(answer, `シークレット${i + 1}`))}
               </div>
               {round.clearedAt === null && <p className={styles.secretNote}>シークレットはクリアに入りません。クリアしたあとも、つづけてさがせます。</p>}

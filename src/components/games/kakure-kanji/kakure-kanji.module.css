@@ -428,11 +428,15 @@
   color: var(--ai);
   background: color-mix(in srgb, var(--ai) 9%, var(--card));
 }
+.mainSlots {
+  gap: 6px;
+}
 .mainSlots .slot {
-  font-size: 38px;
+  font-size: clamp(22px, 7.6vw, 38px);
+  border-radius: 12px;
 }
 .mainSlots .slot[data-found="false"] {
-  font-size: 22px;
+  font-size: 18px;
 }
 .slotGrade {
   position: absolute;
@@ -463,11 +467,10 @@
 }
 .secretBox .slots {
   margin-top: 8px;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
-  gap: 6px;
+  gap: 5px;
 }
 .secretBox .slot {
-  font-size: clamp(18px, 6vw, 26px);
+  font-size: clamp(16px, 5.4vw, 24px);
   border-radius: 12px;
 }
 .secretHead {
