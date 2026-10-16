@@ -1,4 +1,4 @@
-import { MAP_SIZE, type ParkLot, type Tile } from "./town-builder";
+import { MAP_SIZE, isRoadTile, type ParkLot, type Tile } from "./town-builder";
 
 /**
  * How people get round a park: along the gaps between tiles, inside the fence and across open lawn,
@@ -28,7 +28,7 @@ export function parkGates(lot: Pick<ParkLot, "x" | "y" | "width" | "height" | "p
     for (let k = 0; k < count; k++) {
       const x = dx ? dx < 0 ? lot.x : lot.x + lot.width - 1 : lot.x + k, y = dy ? dy < 0 ? lot.y : lot.y + lot.height - 1 : lot.y + k;
       const nx = x + dx, ny = y + dy, score = Math.abs(k - (count - 1) / 2) + (taken.has(y * MAP_SIZE + x) ? MAP_SIZE : 0);
-      if (nx < 0 || ny < 0 || nx >= MAP_SIZE || ny >= MAP_SIZE || tiles[ny * MAP_SIZE + nx] !== "road" || score >= best) continue;
+      if (nx < 0 || ny < 0 || nx >= MAP_SIZE || ny >= MAP_SIZE || !isRoadTile(tiles[ny * MAP_SIZE + nx]) || score >= best) continue;
       cell = y * MAP_SIZE + x; best = score;
     }
     if (cell >= 0) gates.push({ cell, dx, dy });
@@ -64,7 +64,7 @@ export function parkWays(lot: ParkLot, tiles: readonly Tile[]): ParkWays {
   }
   const gaps: number[] = [];
   for (let j = 1; j < H; j++) for (let i = 1; i < W; i++) gaps.push(corner(i, j));
-  const road = (p: Point) => tiles[Math.floor(p.y) * MAP_SIZE + Math.floor(p.x)] === "road";
+  const road = (p: Point) => isRoadTile(tiles[Math.floor(p.y) * MAP_SIZE + Math.floor(p.x)]);
   const gates = parkGates(lot, tiles).map(({ cell, dx, dy }): ParkGate => {
     const ex = cell % MAP_SIZE + .5 + dx * .5, ey = Math.floor(cell / MAP_SIZE) + .5 + dy * .5, busy = blocked.has(cell);
     const inside = { x: ex - dx * (busy ? .1 : .16), y: ey - dy * (busy ? .1 : .16) }, outside = { x: ex + dx * .2, y: ey + dy * .2 };

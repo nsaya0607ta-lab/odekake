@@ -394,4 +394,171 @@ test('park trees are lit with twinkling lights from dusk in December, and a park
   assert.equal(lights('2026-12-15', 13).length, 0, 'Not in the daytime');
   assert.equal(lights('2026-11-15', 19.5).length, 0, 'Not before December');
 });
+const sidewalksModule = load('src/lib/games/town-sidewalks.ts'), trafficModule = load('src/lib/games/town-traffic.ts'), transportModule = load('src/lib/games/town-transport.ts');
+/** Road adjacency like the renderer's: every road tile and its road neighbours. */
+const roadMap = town => new Map(town.tiles.flatMap((t, i) => t === 'road' ? [[i, game.neighbours(i % 24, Math.floor(i / 24)).filter(n => town.tiles[n] === 'road')]] : []));
+function grid() {
+  let town = { ...blank(), money: 1e7 };
+  for (const y of [4, 10, 16]) town = game.buildLine(town, 'road', game.lineTiles(game.indexAt(2, y), game.indexAt(14, y))).town;
+  for (const x of [2, 8, 14]) town = game.buildLine(town, 'road', game.lineTiles(game.indexAt(x, 4), game.indexAt(x, 16))).town;
+  return town;
+}
+test('pedestrians keep to the sidewalks and cross the road only at the zebra crossings of junctions', () => {
+  const town = grid(), roads = roadMap(town), w = sidewalksModule.walkways(roads, (_tile, arms) => arms >= 3);
+  const onRoad = (x, y) => { const tile = Math.floor(y) * 24 + Math.floor(x), u = x % 1, v = y % 1; return roads.has(tile) && Math.abs(u - .5) < .24 && Math.abs(v - .5) < .24 ? tile : -1; };
+  const doors = [[game.indexAt(5, 3), game.indexAt(5, 4)], [game.indexAt(11, 17), game.indexAt(11, 16)], [game.indexAt(1, 12), game.indexAt(2, 12)], [game.indexAt(9, 7), game.indexAt(8, 7)]];
+  for (const [a, ra] of doors) for (const [b, rb] of doors) {
+    if (a === b) continue;
+    const side = (house, road) => ({ dx: house % 24 - road % 24, dy: Math.floor(house / 24) - Math.floor(road / 24) });
+    const route = sidewalksModule.sidewalkRoute(w, { road: ra, side: side(a, ra) }, { road: rb, side: side(b, rb) });
+    assert(route && route.length >= 2, 'Every door can be reached on foot');
+    for (let j = 1; j < route.length; j++) for (let k = 1; k < 10; k++) {
+      const x = route[j - 1].x + (route[j].x - route[j - 1].x) * k / 10, y = route[j - 1].y + (route[j].y - route[j - 1].y) * k / 10, tile = onRoad(x, y);
+      if (tile >= 0) assert(roads.get(tile).length >= 3, `Off the crosswalk at ${x.toFixed(2)},${y.toFixed(2)}`);
+      const u = x % 1, v = y % 1;
+      if (tile >= 0) assert(Math.abs(u - .5) > .25 || Math.abs(v - .5) > .25 || Math.min(Math.abs(u - .2), Math.abs(u - .8), Math.abs(v - .2), Math.abs(v - .8)) < .01, 'Crossing on the zebra line, never through the middle of the junction');
+    }
+  }
+  // A single street with houses on both sides and no junction: people cross it there, since there is no other way.
+  let lane = { ...blank(), money: 1e7 }; lane = game.buildLine(lane, 'road', game.lineTiles(game.indexAt(3, 8), game.indexAt(9, 8))).town;
+  const lw = sidewalksModule.walkways(roadMap(lane), (_tile, arms) => arms >= 3);
+  assert(sidewalksModule.sidewalkRoute(lw, { road: game.indexAt(4, 8), side: { dx: 0, dy: -1 } }, { road: game.indexAt(7, 8), side: { dx: 0, dy: 1 } }));
+});
+test('cars keep their distance, take turns in junctions and never overlap', () => {
+  const town = grid(), roads = roadMap(town), traffic = new trafficModule.Traffic();
+  traffic.sync(roads, tile => town.tiles[tile] === 'road');
+  assert(traffic.vehicles.length >= 10);
+  let progress = 0;
+  for (let j = 0; j < 3000; j++) {
+    const before = traffic.vehicles.map(v => v.t);
+    traffic.update(1 / 30, 1 / 30, 1, j / 30);
+    progress += traffic.vehicles.reduce((sum, v, k) => sum + ((v.t - before[k] + 1) % 1), 0);
+    const poses = traffic.poses();
+    for (let a = 0; a < poses.length; a++) for (let b = a + 1; b < poses.length; b++) assert(Math.hypot(poses[a].x - poses[b].x, poses[a].y - poses[b].y) >= .2, 'Two cars on top of each other');
+    const inJunction = new Map();
+    for (const v of traffic.vehicles) {
+      const tile = v.t >= trafficModule.STOP_LINE ? v.to : v.t < 1 - trafficModule.STOP_LINE ? v.from : -1;
+      if (tile >= 0 && roads.get(tile).length >= 3) { assert(!inJunction.has(tile), 'One car at a time in a junction'); inJunction.set(tile, v); }
+    }
+  }
+  assert(progress / traffic.vehicles.length > 40, 'Cars keep moving instead of jamming');
+  // A red light (the town's gate) holds a car at the stop line.
+  const held = new trafficModule.Traffic(); held.sync(roads, tile => town.tiles[tile] === 'road');
+  for (let j = 0; j < 600; j++) held.update(1 / 30, 1 / 30, 1, j / 30, tile => roads.get(tile).length < 3);
+  for (const v of held.vehicles) if (roads.get(v.to).length >= 3) assert(v.t < trafficModule.STOP_LINE, 'Stopped before the junction');
+  assert.ok(transportModule.sampleTransportPath);
+});
+const roadPartsModule = load('src/lib/games/town-road-parts.ts');
+/** A grid of streets lined with houses, so people walk and drive through every junction. */
+function busyGrid(parts) {
+  let town = grid();
+  for (const y of [3, 5, 9, 11, 15, 17]) for (const x of [4, 6, 10, 12]) town = game.buildTile(town, (x + y) % 3 ? 'house' : 'shop', x, y).town;
+  for (const [x, y, part] of parts) { const r = game.buyFacilityPart(town, game.indexAt(x, y), part); assert.notEqual(r.town, town, `${part} at ${x},${y}: ${r.message}`); town = r.town; }
+  return town;
+}
+const segment = w => { let j = 0; while (j < w.lengths.length - 2 && w.lengths[j + 1] <= w.s) j++; return j; };
+test('traffic lights: cars go on green and people cross on the walk light, never against it', () => {
+  const town = busyGrid([[8, 10, 'signal'], [8, 7, 'signal']]), junction = game.indexAt(8, 10), mid = game.indexAt(8, 7);
+  const scene = new TownScene(), record = recordingContext(), day = env('2026-10-14', 10);
+  scene.camera = { x: 200, y: -100, zoom: 1 };
+  let cars = 0, people = 0, waited = 0;
+  const last = new Map(), crossing = new Map();
+  for (let j = 0; j < 30 * 70; j++) {
+    scene.render(record.c, 400, 400, town, { ...options, environment: day }, 1 / 30);
+    for (const tile of [junction, mid]) {
+      const layout = scene.roadLayouts.get(tile), state = roadPartsModule.signalState(layout, scene.time);
+      for (const v of scene.traffic.vehicles) {
+        const before = last.get(v);
+        if (before && before.to === tile && v.to === tile && before.t < trafficModule.STOP_LINE && v.t >= trafficModule.STOP_LINE) {
+          cars++; assert.equal(state[Math.abs(tile - v.from) === 1 ? 'x' : 'y'], 'green', 'A car went in against the light');
+        }
+        if (v.to === tile && v.t < trafficModule.STOP_LINE && v.t > trafficModule.STOP_LINE - .05 && state[Math.abs(tile - v.from) === 1 ? 'x' : 'y'] !== 'green') waited++;
+      }
+      for (const w of scene.life.walkers) {
+        const k = segment(w), end = w.points[k + 1], start = w.points[k], on = end && end.cross && end.cross.tile === tile;
+        if (on && crossing.get(w) !== `${tile}:${k}`) {
+          const along = Math.abs(end.x - start.x) > Math.abs(end.y - start.y) ? 'x' : 'y';
+          people++; assert.equal(along === 'x' ? state.walkX : state.walkY, 'walk', 'Someone stepped out against the walk light');
+        }
+        if (on) crossing.set(w, `${tile}:${k}`); else if (crossing.get(w)?.startsWith(`${tile}:`)) crossing.delete(w);
+      }
+    }
+    for (const v of scene.traffic.vehicles) last.set(v, { to: v.to, t: v.t });
+    // Nobody drives into anybody, whether waiting at the lights or coming back into sight.
+    const poses = scene.traffic.poses();
+    for (let a = 0; a < poses.length; a++) for (let b = a + 1; b < poses.length; b++) assert(Math.hypot(poses[a].x - poses[b].x, poses[a].y - poses[b].y) >= .2, 'Two cars on top of each other at the lights');
+  }
+  assert(cars > 10, `Cars drove through the lights (${cars})`); assert(people > 2, `People crossed at the lights (${people})`); assert(waited > 0, 'Cars waited at a red light');
+});
+test('a stop sign: every car stops at the line first', () => {
+  const town = busyGrid([[8, 10, 'stopSign']]), junction = game.indexAt(8, 10);
+  const scene = new TownScene(), record = recordingContext(), day = env('2026-10-14', 10);
+  scene.camera = { x: 200, y: -100, zoom: 1 };
+  let stops = 0;
+  const last = new Map();
+  for (let j = 0; j < 30 * 60; j++) {
+    scene.render(record.c, 400, 400, town, { ...options, environment: day }, 1 / 30);
+    for (const v of scene.traffic.vehicles) {
+      const before = last.get(v);
+      if (before && before.to === junction && v.to === junction && before.t < trafficModule.STOP_LINE && v.t >= trafficModule.STOP_LINE) { stops++; assert(before.halt >= .85, `Rolled through the stop sign after ${before.halt.toFixed(2)} s`); }
+      last.set(v, { to: v.to, t: v.t, halt: v.halt });
+    }
+  }
+  assert(stops > 5, `Cars came to the stop sign (${stops})`);
+});
+test('a crosswalk in the middle of a street: people cross there, and cars wait until they are over', () => {
+  let town = { ...blank(), money: 1e7 };
+  town = game.buildLine(town, 'road', game.lineTiles(game.indexAt(3, 8), game.indexAt(17, 8))).town;
+  for (let x = 4; x <= 16; x += 2) for (const y of [7, 9]) town = game.buildTile(town, 'house', x, y).town;
+  const walk = game.indexAt(10, 8); town = game.buyFacilityPart(town, walk, 'crosswalk').town;
+  const scene = new TownScene(), record = recordingContext(), day = env('2026-10-14', 10);
+  scene.camera = { x: 200, y: -100, zoom: 1 };
+  let crossed = 0, waited = 0;
+  for (let j = 0; j < 30 * 90; j++) {
+    scene.render(record.c, 400, 400, town, { ...options, environment: day }, 1 / 30);
+    const people = scene.life.crossing.get(`${walk}:0`) ?? 0;
+    if (people) crossed++;
+    for (const v of scene.traffic.vehicles) {
+      if (people && v.alpha > 0 && (v.to === walk && v.t >= .76 || v.from === walk && v.t <= .24)) assert.fail('A car drove over the crosswalk while someone was on it');
+      if (people && v.to === walk && v.t < trafficModule.STOP_LINE && v.t > trafficModule.STOP_LINE - .05) waited++;
+    }
+  }
+  assert(crossed > 0, 'People used the crosswalk'); assert(waited > 0, 'A car waited for them');
+});
+test('buses stop at the bus stops and the people waiting get on', () => {
+  const town = busyGrid([[5, 4, 'busStop'], [11, 16, 'busStop'], [2, 7, 'busStop']]);
+  const scene = new TownScene(), record = recordingContext(), day = env('2026-10-14', 10);
+  scene.camera = { x: 200, y: -100, zoom: 1 };
+  let dwelt = 0, boarded = 0;
+  const stops = new Set([game.indexAt(5, 4), game.indexAt(11, 16), game.indexAt(2, 7)]);
+  for (let j = 0; j < 30 * 120; j++) {
+    const queues = scene.life.queues.map(q => q.count);
+    scene.render(record.c, 400, 400, town, { ...options, environment: day }, 1 / 30);
+    for (const d of scene.traffic.dwelling()) { assert(stops.has(d.tile), 'A bus stood where there is no stop'); dwelt++; }
+    scene.life.queues.forEach((q, k) => { if (q.count < queues[k] && scene.life.boarding.get(q.tile) === q.side) boarded++; });
+  }
+  assert(scene.traffic.vehicles.some(v => v.model === 'bus'), 'Buses run once the town has bus stops');
+  assert(dwelt > 0, 'A bus stood at a stop'); assert(boarded > 0, 'Passengers got on');
+});
+test('people cross a long street by its footbridge, up the stairs and over the cars', () => {
+  let town = { ...blank(), money: 1e7 };
+  town = game.buildLine(town, 'road', game.lineTiles(game.indexAt(8, 3), game.indexAt(8, 17))).town;
+  for (let y = 4; y <= 16; y += 2) for (const x of [7, 9]) town = game.buildTile(town, 'house', x, y).town;
+  town = game.buyFacilityPart(town, game.indexAt(8, 10), 'footbridge').town;
+  const scene = new TownScene(), record = recordingContext(), day = env('2026-10-14', 10);
+  scene.camera = { x: 200, y: -100, zoom: 1 };
+  let lifted = 0, top = 0;
+  for (let j = 0; j < 30 * 60; j++) {
+    scene.render(record.c, 400, 400, town, { ...options, environment: day }, 1 / 30);
+    for (const w of scene.life.walkers) {
+      const k = segment(w), a = w.points[k], b = w.points[k + 1] ?? a, t = Math.min(1, Math.max(0, (w.s - w.lengths[k]) / ((w.lengths[k + 1] ?? w.s) - w.lengths[k] || 1)));
+      const z = (a.z ?? 0) + ((b.z ?? 0) - (a.z ?? 0)) * t;
+      if (z > 1) { lifted++; top = Math.max(top, z); }
+      // Up on the bridge, nobody is over the middle of the road at ground level.
+      const x = a.x + (b.x - a.x) * t, onTile = Math.floor(x) === 8 && Math.floor(a.y + (b.y - a.y) * t) === 10;
+      if (onTile && Math.abs(x - 8.5) < .2) assert(z > 10, 'Walking across the road under the footbridge');
+    }
+  }
+  assert(lifted > 0, 'People walked over the footbridge'); assert.equal(top, roadPartsModule.BRIDGE_Z);
+});
 console.log(`${passed} living town checks passed`);

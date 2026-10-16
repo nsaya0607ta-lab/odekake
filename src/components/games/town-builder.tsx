@@ -3,7 +3,7 @@ import { buildingStage } from "@/lib/games/town-building-models";
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { BUILDINGS, FACILITY_PARTS, MAP_SIZE, PARK_PARTS, PARK_SIZES, createTown, decodeTown, getTownStats, lineTiles, parkAt, touchesRoad, type FacilityPart, type ParkLot, type ParkPart, type ParkSize, type Tool, type Town } from "@/lib/games/town-builder";
+import { BUILDINGS, FACILITY_PARTS, MAP_SIZE, PARK_PARTS, PARK_SIZES, createTown, decodeTown, getTownStats, lineTiles, parkAt, roadPartProblem, touchesRoad, type FacilityPart, type ParkLot, type ParkPart, type ParkSize, type Tool, type Town } from "@/lib/games/town-builder";
 import { TownScene, drawTownIcon, type SceneOptions } from "@/lib/games/town-renderer";
 import { TownCanvas } from "@/lib/games/town-canvas";
 import { TownTouchControls } from "@/lib/games/town-touch-controls";
@@ -621,7 +621,7 @@ export function TownBuilder({ userId }: { userId: string }) {
         if (!window.confirm("この敷地と中の部品を撤去しますか？")) return;
         const intent = interaction.current;
         void edit({ type: "remove-park", lotId: editingLot.id }).then(ok => { if (ok && interaction.current === intent) { setPanel(null); setEditingLotId(null); setMode("inspect"); setSelected(null); } });
-      }} /> : active && selected !== null ? <FacilityWorkshop kind={active} installed={selectedParts ?? []} money={snapshot && !pendingRequest.current && !busy ? town.money : -1} onBuy={(id: FacilityPart) => { void edit({ type: "facility-part", tile: selected, part: id }); }} onRemove={id => { void edit({ type: "remove-facility-part", tile: selected, part: id }); }} /> : null)}
+      }} /> : active && selected !== null ? <FacilityWorkshop kind={active} installed={selectedParts ?? []} money={snapshot && !pendingRequest.current && !busy ? town.money : -1} problem={id => roadPartProblem(town, selected, id)} onBuy={(id: FacilityPart) => { void edit({ type: "facility-part", tile: selected, part: id }); }} onRemove={id => { void edit({ type: "remove-facility-part", tile: selected, part: id }); }} /> : null)}
       {panel === "view" && <>
         <SkySettings sky={sky} />
         <div className={styles.viewOptions}>
@@ -643,8 +643,8 @@ export function TownBuilder({ userId }: { userId: string }) {
       </div>}
     </aside>}
     {showSelection && active && selected !== null && <section ref={selectionRef} className={styles.selectionCard} aria-label="選択した建物" data-selected-tile={selected}>
-      <div className={styles.selectionInfo}><strong>{selectedLot ? selectedLot.kind === "park" ? "公園" : "広場" : selectedStage ?? BUILDINGS.find(b => b.id === active)?.title}{town.levels[selected]! > 0 && <small>Lv.{town.levels[selected]}</small>}{selectedLot && <small>{selectedLot.width}×{selectedLot.height}</small>}</strong>
-        <p>{selectedLot ? `部品 ${selectedLot.parts.length}点${selectedLot.parts.length ? parkLife : " · 部品を追加しよう"}` : active === "home" ? "わんこが待っている、あなたの家です" : canUpgrade ? connected ? `道路接続${active === "house" ? ` · 定員 ${(town.levels[selected] || 1) * 18 + (selectedParts?.includes("terrace") ? 6 : 0)}人` : ""}` : "道路への接続が必要です" : active === "station" ? stats.routes.some(r => r[0] === selected || r[r.length - 1] === selected) ? "列車が運行しています" : "もう1つの駅へ線路をつなごう" : "街をつなぐ道"}</p>
+      <div className={styles.selectionInfo}><strong>{selectedLot ? selectedLot.kind === "park" ? "公園" : "広場" : selectedStage ?? (active === "crossing" ? "踏切" : BUILDINGS.find(b => b.id === active)?.title)}{town.levels[selected]! > 0 && <small>Lv.{town.levels[selected]}</small>}{selectedLot && <small>{selectedLot.width}×{selectedLot.height}</small>}</strong>
+        <p>{selectedLot ? `部品 ${selectedLot.parts.length}点${selectedLot.parts.length ? parkLife : " · 部品を追加しよう"}` : active === "home" ? "わんこが待っている、あなたの家です" : canUpgrade ? connected ? `道路接続${active === "house" ? ` · 定員 ${(town.levels[selected] || 1) * 18 + (selectedParts?.includes("terrace") ? 6 : 0)}人` : ""}` : "道路への接続が必要です" : active === "station" ? stats.routes.some(r => r[0] === selected || r[r.length - 1] === selected) ? "列車が運行しています" : "もう1つの駅へ線路をつなごう" : active === "crossing" ? "列車が近づくと警報が鳴り、遮断機が下ります" : active === "road" && selectedParts?.length ? selectedParts.map(id => FACILITY_PARTS.find(p => p.id === id)?.title).join("・") : "街をつなぐ道"}</p>
       </div>
       {active === "home" && <Link href="/room" className={styles.roomLink} onClick={() => flushSave()}><span>マイルームへ</span><small>部屋に入る</small></Link>}
       {canUpgrade && <button type="button" className={styles.upgrade} aria-label={nextStage ? `${nextStage}へ増築する 建物Lv.${selectedLevel + 1}` : undefined} onClick={upgrade} disabled={!snapshot || Boolean(pendingRequest.current) || busy || town.levels[selected]! >= 3 || !connected || town.money < (town.levels[selected] || 1) * 450}>{town.levels[selected]! >= 3 ? "最大Lv." : <><span>増築する</span><small>建物Lv.{selectedLevel + 1} · <WhitePrice amount={(town.levels[selected] || 1) * 450} /></small></>}</button>}

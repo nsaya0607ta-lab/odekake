@@ -1,14 +1,20 @@
 // Independent simulation; OpenTTD code and assets are not used.
 export const MAP_SIZE = 24;
-export type Tile = "grass" | "water" | "road" | "rail" | "station" | "house" | "shop" | "factory" | "park" | "home";
-export type Tool = Exclude<Tile, "grass" | "water"> | "bulldoze";
+export type Tile = "grass" | "water" | "road" | "rail" | "station" | "house" | "shop" | "factory" | "park" | "home" | "crossing";
+export type Tool = Exclude<Tile, "grass" | "water" | "crossing"> | "bulldoze";
+/** Cars and people use roads and level crossings; trains run on rails, stations and level crossings. */
+export const isRoadTile = (tile: Tile | undefined) => tile === "road" || tile === "crossing";
+export const isRailTile = (tile: Tile | undefined) => tile === "rail" || tile === "station" || tile === "crossing";
+/** A level crossing (踏切) where a road crosses a straight railway at a right angle. */
+export const CROSSING_PRICE = 90;
 export type ParkPart = "tree" | "flowers" | "bench" | "fountain" | "playground" | "path" | "light" | "cherry" | "pine" | "hedge" | "pond" | "gazebo" | "picnic" | "swings" | "sandbox" | "sculpture" | "clock" | "trash" | "bikeRack" | "stones" | "arch"
   | "seesaw" | "springRider" | "globe" | "carousel" | "jungleGym" | "splashPad" | "bars" | "basketball"
   | "maple" | "ginkgo" | "wisteria" | "flowerField" | "bamboo"
   | "foodCart" | "parasol" | "drinkFountain" | "bandstand"
   | "windmill" | "flowerClock" | "lantern" | "flagPole";
 export type ParkLot = { id: number; x: number; y: number; width: number; height: number; kind: "park" | "plaza"; parts: { tile: number; kind: ParkPart; rotation: number }[] };
-export type FacilityPart = "garden" | "terrace" | "light" | "sign" | "storage" | "greenbelt" | "solar" | "bench" | "vending" | "canopy" | "planter";
+export type FacilityPart = "garden" | "terrace" | "light" | "sign" | "storage" | "greenbelt" | "solar" | "bench" | "vending" | "canopy" | "planter"
+  | "signal" | "crosswalk" | "busStop" | "footbridge" | "roadTrees" | "pole" | "mirror" | "guardrail" | "postbox" | "stopSign" | "paving";
 export type FacilityAttachment = { tile: number; kind: Tile; parts: FacilityPart[] };
 export type Town = { tiles: Tile[]; money: number; day: number; paused: boolean; levels: number[]; terrain: boolean[]; rewards: string[]; parks: ParkLot[]; attachments: FacilityAttachment[] };
 export const PARK_SIZES = [
@@ -73,18 +79,56 @@ export const FACILITY_PARTS: ReadonlyArray<{ id: FacilityPart; title: string; pr
   { id: "greenbelt", title: "緑化帯", price: 140, kinds: ["factory"], info: "近所への影響を和らげる" },
   { id: "solar", title: "太陽光パネル", price: 260, kinds: ["factory"], info: "工場の経済力＋8・維持負担−4" },
   { id: "bench", title: "待合ベンチ", price: 90, kinds: ["station"], info: "ホームに休憩場所を追加" },
-  { id: "vending", title: "自販機", price: 160, kinds: ["shop", "station"], info: "飲み物を買える場所" },
+  { id: "vending", title: "自販機", price: 160, kinds: ["shop", "station", "road"], info: "飲み物を買える場所" },
   { id: "canopy", title: "日よけ", price: 180, kinds: ["house", "shop"], info: "庭先・屋上に日陰をつくる" },
   { id: "planter", title: "プランター", price: 80, kinds: ["house", "shop", "station"], info: "入口に緑を添える" },
+  // Road parts (2026-10-16): they change how cars and people use the road, or simply dress the street.
+  { id: "signal", title: "信号機", price: 240, kinds: ["road"], info: "車も人も青になるのを待って進む" },
+  { id: "crosswalk", title: "横断歩道", price: 60, kinds: ["road"], info: "人がここで道路をわたる。車は人がわたり終えるまで待つ" },
+  { id: "stopSign", title: "一時停止", price: 50, kinds: ["road"], info: "交差点の手前で車が一度止まる" },
+  { id: "busStop", title: "バス停", price: 180, kinds: ["road"], info: "バスが止まり、待っている人が乗りこむ" },
+  { id: "footbridge", title: "歩道橋", price: 420, kinds: ["road"], info: "人が階段をのぼって道路をまたぐ" },
+  { id: "roadTrees", title: "街路樹", price: 120, kinds: ["road"], info: "いちょう並木。秋は黄色く色づく" },
+  { id: "pole", title: "電柱", price: 70, kinds: ["road"], info: "となりの電柱と電線でつながる。小鳥がとまることも" },
+  { id: "mirror", title: "カーブミラー", price: 80, kinds: ["road"], info: "曲がり角やT字路の見通しをよくする" },
+  { id: "guardrail", title: "ガードレール", price: 90, kinds: ["road"], info: "歩道と車道を白い柵で分ける" },
+  { id: "postbox", title: "郵便ポスト", price: 90, kinds: ["road"], info: "手紙を出しに人が立ち寄る" },
+  { id: "paving", title: "石畳", price: 140, kinds: ["road"], info: "道路を石だたみの道にする" },
 ];
+/** Which ways the road on tile `i` carries on (1 left, 2 right, 4 up, 8 down) and the shape that makes. */
+export function roadShape(tiles: readonly Tile[], i: number) {
+  const x = i % MAP_SIZE, y = Math.floor(i / MAP_SIZE), link = (n: number, inside: boolean) => inside && isRoadTile(tiles[n]) && opens(tiles, i, n, "road");
+  const mask = (link(i - 1, x > 0) ? 1 : 0) | (link(i + 1, x < MAP_SIZE - 1) ? 2 : 0) | (link(i - MAP_SIZE, y > 0) ? 4 : 0) | (link(i + MAP_SIZE, y < MAP_SIZE - 1) ? 8 : 0);
+  const arms = (mask & 1) + (mask >> 1 & 1) + (mask >> 2 & 1) + (mask >> 3 & 1);
+  const shape = arms === 4 ? "cross" as const : arms === 3 ? "tee" as const : arms === 2 ? mask === 3 || mask === 12 ? "straight" as const : "corner" as const : arms === 1 ? "end" as const : "none" as const;
+  return { mask, arms, shape, axis: mask & 3 ? "x" as const : mask & 12 ? "y" as const : "x" as const };
+}
+/** Road parts that cannot share one stretch of pavement. */
+const ROAD_CLASHES: readonly (readonly [FacilityPart, FacilityPart])[] = [["footbridge", "busStop"], ["footbridge", "crosswalk"], ["footbridge", "signal"], ["busStop", "crosswalk"], ["busStop", "signal"], ["signal", "stopSign"]];
+/** Why road part `id` cannot go on road tile `tile` as the road is now (its shape, a bridge, a clashing part), or null when it fits. */
+export function roadPartProblem(town: Pick<Town, "tiles" | "terrain" | "attachments">, tile: number, id: FacilityPart): string | null {
+  if (town.tiles[tile] !== "road") return null;
+  const { shape } = roadShape(town.tiles, tile), parts = town.attachments.find(a => a.tile === tile)?.parts ?? [];
+  if ((id === "crosswalk" || id === "busStop" || id === "footbridge") && shape !== "straight") return "まっすぐな道路にだけ置けます";
+  if (id === "signal" && shape !== "straight" && shape !== "tee" && shape !== "cross") return "交差点か、まっすぐな道路に置けます";
+  if (id === "stopSign" && shape !== "tee" && shape !== "cross") return "交差点にだけ置けます";
+  if (id === "mirror" && shape !== "corner" && shape !== "tee") return "曲がり角とT字路に置けます";
+  if (id === "roadTrees" && (shape === "tee" || shape === "cross")) return "交差点には植えられません";
+  if (town.terrain[tile] && id !== "light" && id !== "paving") return "橋の上には置けません";
+  for (const [a, b] of ROAD_CLASHES) {
+    const other = id === a && parts.includes(b) ? b : id === b && parts.includes(a) ? a : null;
+    if (other) return `${FACILITY_PARTS.find(p => p.id === other)!.title}といっしょには置けません`;
+  }
+  return null;
+}
 export type TownStats = {
   population: number; homes: number; shops: number; factories: number; roads: number; rails: number;
   stations: number; parks: number; linkedStations: number; income: number; upkeep: number;
   happiness: number; jobs: number; routes: number[][];
 };
 export const BUILDINGS: ReadonlyArray<{ id: Tool; title: string; price: number; info: string; category: "交通" | "建物" | "環境" }> = [
-  { id: "road", title: "道路", price: 35, info: "タップで1マス配置。「連続敷設」で道路を延ばせます。川の上は橋（白コイン120枚）。", category: "交通" },
-  { id: "rail", title: "線路", price: 55, info: "タップで1マス配置。「連続敷設」で駅を結べます。川の上は鉄道橋（白コイン160枚）。", category: "交通" },
+  { id: "road", title: "道路", price: 35, info: "タップで1マス配置。「連続敷設」で道路を延ばせます。川の上は橋（白コイン120枚）。まっすぐな線路を直角に横切ると踏切（白コイン90枚）。", category: "交通" },
+  { id: "rail", title: "線路", price: 55, info: "タップで1マス配置。「連続敷設」で駅を結べます。川の上は鉄道橋（白コイン160枚）。まっすぐな道路を直角に横切ると踏切（白コイン90枚）。", category: "交通" },
   { id: "station", title: "駅", price: 550, info: "2駅を線路で結ぶと列車が運行。周囲3マスの住民を輸送します。", category: "交通" },
   { id: "house", title: "住宅", price: 250, info: "道路沿いに建設。公園と仕事があると集合住宅へ育ちます。", category: "建物" },
   { id: "shop", title: "商店", price: 400, info: "道路沿いに建設。街に仕事と買い物の楽しみを届けます。", category: "建物" },
@@ -177,6 +221,7 @@ export function buyFacilityPart(town: Town, tile: number, id: FacilityPart) {
   const part = FACILITY_PARTS.find(p => p.id === id), kind = town.tiles[tile], old = town.attachments.find(a => a.tile === tile);
   if (!part || !kind || !part.kinds.includes(kind)) return { town, message: "この施設には取り付けられません" };
   if (old?.parts.includes(id)) return { town, message: "購入済みです" };
+  const problem = roadPartProblem(town, tile, id); if (problem) return { town, message: problem };
   if (town.money < part.price) return { town, message: "部品を購入する資金が不足しています" };
   const next = { tile, kind, parts: [...(old?.parts ?? []), id] };
   return { town: { ...town, attachments: [...town.attachments.filter(a => a.tile !== tile), next], money: town.money - part.price }, message: `${part.title}を取り付けました −¥${part.price}` };
@@ -222,7 +267,30 @@ export function undoTownEdit(current: Town, edit: TownEdit): Town {
   }
   return { ...current, tiles, levels, parks, attachments, money: current.money + edit.cost };
 }
-export function touchesRoad(tiles: Tile[], x: number, y: number) { return neighbours(x, y).some(i => tiles[i] === "road"); }
+export function touchesRoad(tiles: Tile[], x: number, y: number) { return neighbours(x, y).some(i => isRoadTile(tiles[i])); }
+/**
+ * The axis of a straight road or railway at `i` ("x" runs left–right) that carries on both ways, or null when it
+ * bends, branches or ends there.
+ * A level crossing needs one: the other line crosses it at a right angle.
+ */
+export function straightAxis(tiles: readonly Tile[], i: number, kind: "road" | "rail"): "x" | "y" | null {
+  const x = i % MAP_SIZE, y = Math.floor(i / MAP_SIZE), link = (n: number) => (kind === "rail" ? isRailTile(tiles[n]) : isRoadTile(tiles[n])) && opens(tiles, i, n, kind);
+  const left = x > 0 && link(i - 1), right = x < MAP_SIZE - 1 && link(i + 1), up = y > 0 && link(i - MAP_SIZE), down = y < MAP_SIZE - 1 && link(i + MAP_SIZE);
+  return left && right && !up && !down ? "x" : up && down && !left && !right ? "y" : null;
+}
+/**
+ * The way the railway runs through a level crossing ("x" = left–right): where the track carries on beside it,
+ * else across the road. Kept in step with town_crossing_axis in the database.
+ */
+export function crossingAxis(tiles: readonly Tile[], i: number): "x" | "y" {
+  const x = i % MAP_SIZE, y = Math.floor(i / MAP_SIZE), score = (n: number, inside: boolean) => !inside ? 0 : tiles[n] === "rail" || tiles[n] === "station" ? 2 : tiles[n] === "road" ? -2 : 0;
+  return score(i - MAP_SIZE, y > 0) + score(i + MAP_SIZE, y < MAP_SIZE - 1) > score(i - 1, x > 0) + score(i + 1, x < MAP_SIZE - 1) ? "y" : "x";
+}
+/** A level crossing lets a road through only across its railway and a railway only along it; anything else joins freely. */
+export function opens(tiles: readonly Tile[], a: number, b: number, kind: "road" | "rail") {
+  const axis = Math.abs(a - b) === 1 ? "x" : "y", own = (n: number) => tiles[n] !== "crossing" || (crossingAxis(tiles, n) === axis) === (kind === "rail");
+  return own(a) && own(b);
+}
 function near(tiles: Tile[], i: number, kinds: Tile[], radius: number) {
   const x = i % MAP_SIZE, y = Math.floor(i / MAP_SIZE);
   let count = 0;
@@ -244,11 +312,11 @@ export function railRoutes(tiles: Tile[]): number[][] {
         const id = [start, i].sort((a, b) => a - b).join(":");
         const path: number[] = []; let at = i;
         while (at >= 0) { path.push(at); at = parents.get(at) ?? -1; }
-        if (path.some(n => tiles[n] === "rail") && !paired.has(id)) { paired.add(id); routes.push(path.reverse()); }
+        if (path.some(n => tiles[n] === "rail" || tiles[n] === "crossing") && !paired.has(id)) { paired.add(id); routes.push(path.reverse()); }
         continue; // Stations terminate a route; another train can connect the next leg.
       }
       for (const n of neighbours(i % MAP_SIZE, Math.floor(i / MAP_SIZE))) {
-        if (parents.has(n) || !["station", "rail"].includes(tiles[n]!)) continue;
+        if (parents.has(n) || !isRailTile(tiles[n]) || !opens(tiles, i, n, "rail")) continue;
         if (tiles[i] === "station" && tiles[n] === "station") continue;
         parents.set(n, i); queue.push(n);
       }
@@ -289,14 +357,22 @@ export function getTownStats(tiles: Tile[], levels: number[] = [], lots: ParkLot
   // Empty disconnected stations do not produce passenger income.
   const servedHomes = tiles.reduce((sum, t, i) => sum + (t === "house" && routes.some(r => [r[0]!, r[r.length - 1]!].some(s => Math.abs(s % MAP_SIZE - i % MAP_SIZE) + Math.abs(Math.floor(s / MAP_SIZE) - Math.floor(i / MAP_SIZE)) <= 3)) && touchesRoad(tiles, i % MAP_SIZE, Math.floor(i / MAP_SIZE)) ? (levels[i] || 1) : 0), 0);
   income += Math.min(railPassengers * 110, servedHomes * 65);
-  const upkeep = roads * 3 + rails * 4 + stations * 30 + legacyParks.length * 10 + lots.reduce((sum, l) => sum + Math.ceil(l.width * l.height / 4) * 4 + l.parts.length, 0) + factories * 8 - attachments.filter(a => a.kind === "factory" && a.parts.includes("solar")).length * 4;
+  const upkeep = roads * 3 + rails * 4 + count("crossing") * 6 + stations * 30 + legacyParks.length * 10 + lots.reduce((sum, l) => sum + Math.ceil(l.width * l.height / 4) * 4 + l.parts.length, 0) + factories * 8 - attachments.filter(a => a.kind === "factory" && a.parts.includes("solar")).length * 4;
   const happiness = occupied ? Math.round(satisfaction / occupied) : 60;
   return { population, homes, shops, factories, roads, rails, stations, parks, linkedStations, income, upkeep, happiness, jobs, routes };
 }
-export function buildTile(town: Town, tool: Tool, x: number, y: number): { town: Town; message: string } {
+/** `stroke` is the direction of a dragged road or railway through this tile, so a crossing is only made across the line. */
+export function buildTile(town: Town, tool: Tool, x: number, y: number, stroke?: "x" | "y"): { town: Town; message: string } {
   if (!Number.isInteger(x) || !Number.isInteger(y) || x < 0 || y < 0 || x >= MAP_SIZE || y >= MAP_SIZE) return { town, message: "マップの範囲外です" };
   if (tool === "park") return buyParkLot(town, x, y, "small");
   const i = indexAt(x, y), existing = town.tiles[i];
+  if (tool === "road" && existing === "rail" || tool === "rail" && existing === "road") {
+    if (town.terrain[i]) return { town, message: "橋の上には踏切を作れません" };
+    if (!canCross(town, tool, i, stroke)) return { town, message: "踏切は、まっすぐな線路（道路）に直角に交わるときだけ作れます" };
+    if (town.money < CROSSING_PRICE) return { town, message: "資金が不足しています" };
+    const tiles = town.tiles.slice(); tiles[i] = "crossing";
+    return { town: { ...town, tiles, money: town.money - CROSSING_PRICE, attachments: town.attachments.filter(a => a.tile !== i) }, message: `踏切を作りました −¥${CROSSING_PRICE}` };
+  }
   if (tool === "bulldoze") {
     const lot = parkAt(town, i);
     if (lot) return removeParkPart(town, lot.id, i);
@@ -320,12 +396,30 @@ export function lineTiles(from: number, to: number): number[] {
   while (y !== ty) { y += Math.sign(ty - y); result.push(indexAt(x, y)); }
   return result;
 }
+/** The way a dragged stroke runs through each of its tiles ("bend" where it turns), so a road laid along a railway never becomes a row of crossings. */
+export function strokeAxes(path: readonly number[]): ("x" | "y" | "bend" | undefined)[] {
+  const axisOf = (a: number, b: number) => a % MAP_SIZE !== b % MAP_SIZE ? "x" as const : "y" as const;
+  return path.map((i, k) => {
+    const before = k > 0 ? axisOf(path[k - 1]!, i) : undefined, ahead = k < path.length - 1 ? axisOf(i, path[k + 1]!) : undefined;
+    return before && ahead && before !== ahead ? "bend" : before ?? ahead;
+  });
+}
+/** Whether a road (rail) stroke running `stroke` way may cross the railway (road) at `i` there. */
+export function canCross(town: Town, tool: Tool, i: number, stroke?: "x" | "y" | "bend") {
+  const existing = town.tiles[i];
+  if (!(tool === "road" && existing === "rail" || tool === "rail" && existing === "road") || town.terrain[i] || stroke === "bend") return false;
+  const axis = straightAxis(town.tiles, i, existing);
+  return axis !== null && axis !== stroke;
+}
 export function buildLine(town: Town, tool: Tool, path: number[]) {
   let next = town, built = 0; let lastError = "建設できる場所がありません";
-  for (const i of path) {
-    const result = buildTile(next, tool, i % MAP_SIZE, Math.floor(i / MAP_SIZE));
+  const axes = strokeAxes(path);
+  for (const [k, i] of path.entries()) {
+    const stroke = axes[k];
+    if (stroke === "bend" && (tool === "road" && next.tiles[i] === "rail" || tool === "rail" && next.tiles[i] === "road")) return { town, message: "踏切は、まっすぐな線路（道路）に直角に交わるときだけ作れます" };
+    const result = buildTile(next, tool, i % MAP_SIZE, Math.floor(i / MAP_SIZE), stroke === "bend" ? undefined : stroke);
     if (result.town !== next) { next = result.town; built++; }
-    else if (next.tiles[i] !== tool && !(tool === "bulldoze" && ["grass", "water"].includes(next.tiles[i]!))) {
+    else if (next.tiles[i] !== tool && !(next.tiles[i] === "crossing" && (tool === "road" || tool === "rail")) && !(tool === "bulldoze" && ["grass", "water"].includes(next.tiles[i]!))) {
       // A stroke is atomic: blockers or insufficient funds leave the entire road unchanged.
       return { town, message: result.message };
     } else lastError = result.message;
@@ -373,7 +467,7 @@ export function decodeTown(raw: string | null): Town | null {
   try {
     const obj = JSON.parse(raw) as Record<string, unknown>;
     if (!obj || typeof obj !== "object") return null;
-    const allowed = new Set(["grass", "water", "road", "rail", "station", "house", "shop", "factory", "park", "home"]);
+    const allowed = new Set(["grass", "water", "road", "rail", "station", "house", "shop", "factory", "park", "home", "crossing"]);
     if (!Array.isArray(obj.tiles) || obj.tiles.length !== MAP_SIZE ** 2 || !obj.tiles.every(v => allowed.has(v)) || obj.tiles.filter(v => v === "home").length > 1) return null;
     if (typeof obj.money !== "number" || !Number.isFinite(obj.money) || Math.abs(obj.money) > 1e12) return null;
     if (typeof obj.day !== "number" || !Number.isInteger(obj.day) || obj.day < 1 || obj.day > 1e9) return null;

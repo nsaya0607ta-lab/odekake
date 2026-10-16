@@ -1,4 +1,4 @@
-import { MAP_SIZE, type Town } from "./town-builder";
+import { MAP_SIZE, isRailTile, isRoadTile, opens, type Town } from "./town-builder";
 
 export type GroundPoint = { x: number; y: number };
 export const DIRECTIONS = [
@@ -12,8 +12,8 @@ export function transportMask(town: Town, i: number, kind: TransportKind): numbe
   return DIRECTIONS.reduce((mask, { bit, dx, dy }) => {
     const nx = x + dx, ny = y + dy;
     if (nx < 0 || ny < 0 || nx >= MAP_SIZE || ny >= MAP_SIZE) return mask;
-    const tile = town.tiles[ny * MAP_SIZE + nx];
-    return tile === kind || kind === "rail" && tile === "station" ? mask | bit : mask;
+    const n = ny * MAP_SIZE + nx, tile = town.tiles[n];
+    return (kind === "road" ? isRoadTile(tile) : isRailTile(tile)) && opens(town.tiles, i, n, kind) ? mask | bit : mask;
   }, 0);
 }
 

@@ -1,11 +1,13 @@
-import { MAP_SIZE, lotTiles, neighbours, type ParkLot, type ParkPart, type Tile, type Town } from "./town-builder";
+import { MAP_SIZE, isRoadTile, lotTiles, neighbours, type ParkLot, type ParkPart, type Tile, type Town } from "./town-builder";
 import type { TownEnvironment } from "./town-environment";
-import { TAU, drawDog, drawPerson, drawPigeon, ellipse, stroke, type Look, type Point } from "./town-figures";
+import { TAU, drawBicycle, drawDog, drawPerson, drawPigeon, ellipse, stroke, type Look, type Point } from "./town-figures";
 import { parkArtVariant } from "./town-park-art";
 import { PAINTED, PART_MOTION, PART_SPOTS, illuminationSeason, motionDepth, motionKit, spotDuration, spotOpen, type PartFrame, type PartState, type Rider, type SpotKind, type Who } from "./town-park-motion";
 import { parkRoute, parkStroll, parkWays, routeLength, type ParkGate, type ParkWays } from "./town-park-paths";
 import { shade } from "./town-paint";
-import { elevationAt, sampleTransportPath } from "./town-transport";
+import type { RoadLayout } from "./town-road-parts";
+import { sidewalkRoute, walkways, type WalkPoint, type Walkways } from "./town-sidewalks";
+import { elevationAt } from "./town-transport";
 
 export { drawDog, drawPerson } from "./town-figures";
 
@@ -19,7 +21,17 @@ const iso = (x: number, y: number, z = 0): Point => ({ x: (x - y) * 32, y: (x + 
 const hash = (n: number) => { const v = Math.sin(n * 12.9898 + 78.233) * 43758.5453; return v - Math.floor(v); };
 
 type Door = { tile: number; kind: Tile; road: number; dx: number; dy: number };
-type Walker = { points: Point[]; lengths: number[]; total: number; s: number; speed: number; look: Look; seed: number; phase: number };
+type Walker = {
+  points: WalkPoint[]; lengths: number[]; total: number; s: number; speed: number; look: Look; seed: number; phase: number;
+  /** Seconds left standing at a post box or a vending machine, the way they face meanwhile, and the stops passed. */
+  pause: number; face: number; passed: number[];
+  /** Riding a bicycle along the sidewalk (in the frame's colour): faster, and nobody stops to post a letter on a bike. */
+  bike: string | null;
+};
+/** People waiting at one side of a bus stop. */
+type Queue = { key: string; tile: number; side: -1 | 1; x: number; y: number; along: { dx: number; dy: number }; toRoad: { dx: number; dy: number }; shelter: boolean; count: number; clock: number; looks: Look[]; boarding: boolean };
+/** A post box or vending machine people may stop at on their way: where they stand and the way they face. */
+type Stop = { x: number; y: number; dx: number; dy: number; kind: "postbox" | "vending" };
 /** A place in a park where someone does something: plays on a part, sits, looks, queues, or plays on the lawn. */
 type Spot = { key: string; lot: number; kind: SpotKind; part: ParkPart | null; slot: number; x: number; y: number; tile: number; rotation: number; u: number; v: number; z: number; facing: number; side: number; who: Who };
 /**
@@ -182,10 +194,10 @@ function polyline(points: Point[]) {
   for (let i = 1; i < points.length; i++) lengths.push(lengths[i - 1]! + Math.hypot(points[i]!.x - points[i - 1]!.x, points[i]!.y - points[i - 1]!.y));
   return { lengths, total: lengths[lengths.length - 1]! };
 }
-function at(w: { points: Point[]; lengths: number[] }, s: number) {
+function at(w: { points: (Point & { z?: number })[]; lengths: number[] }, s: number) {
   let i = 1; while (i < w.lengths.length - 1 && w.lengths[i]! < s) i++;
   const a = w.points[i - 1]!, b = w.points[i]!, span = w.lengths[i]! - w.lengths[i - 1]! || 1, t = Math.max(0, Math.min(1, (s - w.lengths[i - 1]!) / span));
-  return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t, dx: (b.x - a.x) / span, dy: (b.y - a.y) / span };
+  return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t, z: (a.z ?? 0) + ((b.z ?? 0) - (a.z ?? 0)) * t, dx: (b.x - a.x) / span, dy: (b.y - a.y) / span };
 }
 
 export class TownLife {
@@ -197,6 +209,8 @@ export class TownLife {
   private sparks: Spark[] = [];
   private doors: Door[] = [];
   private roads = new Map<number, number[]>();
+  /** The sidewalk network, rebuilt when the roads change. */
+  private walkway: Walkways | null = null;
   private water: number[] = [];
   private parks: ParkLot[] = [];
   private spots = new Map<string, Spot>();
@@ -215,6 +229,17 @@ export class TownLife {
   private env: TownEnvironment | null = null;
   /** Set by the renderer when the viewer prefers reduced motion: decorative turning and splashing stop. */
   reduced = false;
+  /** Level crossings whose barriers are down: people wait before them. Set by the renderer every frame. */
+  closed: ReadonlySet<number> = new Set();
+  /** May someone step onto the road here now (the walk light, cars coming)? Set by the renderer. */
+  mayCross: (cross: NonNullable<WalkPoint["cross"]>, along: "x" | "y") => boolean = () => true;
+  /** People on the road right now, by `${tile}:${arm}` (arm 0: a crossing in the middle of the road). Cars wait for them. */
+  crossing = new Map<string, number>();
+  /** Buses standing at a stop: the stop tile and the side whose passengers get on. Set by the renderer. */
+  boarding = new Map<number, -1 | 1>();
+  private roadParts: ReadonlyMap<number, RoadLayout> = new Map();
+  private queues: Queue[] = [];
+  private stops: Stop[] = [];
   private blooms: Point[] = [];
   private chimneys: { x: number; y: number; z: number; seed: number }[] = [];
   private tiles: Tile[] | null = null;
@@ -229,14 +254,14 @@ export class TownLife {
   sync(town: Town, roads: Map<number, number[]>) {
     if (this.tiles === town.tiles && this.parkRef === town.parks) return;
     const tilesChanged = this.tiles !== town.tiles;
-    this.tiles = town.tiles; this.parkRef = town.parks; this.roads = roads; this.parks = town.parks.filter(p => p.parts.some(part => part.kind !== "path" && part.kind !== "stones"));
+    this.tiles = town.tiles; this.parkRef = town.parks; this.roads = roads; this.walkway = null; this.parks = town.parks.filter(p => p.parts.some(part => part.kind !== "path" && part.kind !== "stones"));
     this.doors = [];
     this.chimneys = [];
     for (let i = 0; i < town.tiles.length; i++) {
       const kind = town.tiles[i]!;
       if (!["house", "shop", "factory", "station", "home"].includes(kind)) continue;
       const x = i % MAP_SIZE, y = Math.floor(i / MAP_SIZE);
-      const road = neighbours(x, y).find(n => town.tiles[n] === "road");
+      const road = neighbours(x, y).find(n => isRoadTile(town.tiles[n]));
       if (road !== undefined) this.doors.push({ tile: i, kind, road, dx: road % MAP_SIZE - x, dy: Math.floor(road / MAP_SIZE) - y });
       if (kind === "house" && (town.levels[i] || 1) === 1 && hash(i * 1.7) > .45) this.chimneys.push({ x: x + .16 + .48, y: y + .15 + .095, z: 32, seed: i });
       if (kind === "home") this.chimneys.push({ x: x + .63, y: y + .3, z: 47, seed: i });
@@ -634,18 +659,25 @@ export class TownLife {
     const x = d.tile % MAP_SIZE + .5 + d.dx * .4, y = Math.floor(d.tile / MAP_SIZE) + .5 + d.dy * .4;
     return { x, y };
   }
-  private route(from: number, to: number): number[] | null {
-    if (from === to) return [from];
-    const parents = new Map<number, number>([[from, -1]]), queue = [from];
-    for (let q = 0; q < queue.length; q++) {
-      const i = queue[q]!;
-      if (i === to) break;
-      for (const n of this.roads.get(i) ?? []) if (!parents.has(n)) { parents.set(n, i); queue.push(n); }
-    }
-    if (!parents.has(to)) return null;
-    const path: number[] = []; let at = to;
-    while (at >= 0) { path.push(at); at = parents.get(at) ?? -1; }
-    return path.reverse();
+  /** Along the sidewalks from one door to another, crossing at the zebra crossings of junctions. */
+  /** The road parts people use: crossings and footbridges for routes, bus stops to wait at, post boxes and vending machines to stop at. */
+  setRoadParts(layouts: ReadonlyMap<number, RoadLayout>) {
+    if (layouts === this.roadParts) return;
+    this.roadParts = layouts; this.walkway = null;
+    const old = new Map(this.queues.map(q => [q.key, q]));
+    this.queues = [...layouts.values()].flatMap(l => l.busWait.map(w => {
+      const key = `${l.tile}:${w.side}`, toRoad = l.axis === "x" ? { dx: 0, dy: -w.side } : { dx: -w.side, dy: 0 };
+      return { ...(old.get(key) ?? { count: 0, clock: 2 + hash(l.tile) * 6, looks: [], boarding: false }), key, tile: l.tile, side: w.side, x: w.x, y: w.y, along: w.along, toRoad, shelter: w.shelter };
+    }));
+    this.stops = [...layouts.values()].flatMap(l => l.items.flatMap(i => i.kind === "postbox" || i.kind === "vending" ? [{ x: i.x + i.facing.dx * .1, y: i.y + i.facing.dy * .1, dx: -i.facing.dx, dy: -i.facing.dy, kind: i.kind }] : []));
+  }
+  private sidewalks(from: Door, to: Door) {
+    this.walkway ??= walkways(this.roads, (_tile, arms) => arms >= 3, tile => {
+      const l = this.roadParts.get(tile);
+      return l && (l.crosswalk || l.bridgeWay) ? { middle: l.crosswalk ? l.axis : undefined, bridge: l.bridgeWay ?? undefined } : undefined;
+    });
+    const route = sidewalkRoute(this.walkway, { road: from.road, side: { dx: -from.dx, dy: -from.dy } }, { road: to.road, side: { dx: -to.dx, dy: -to.dy } });
+    return route && [this.doorPoint(from), ...route, this.doorPoint(to)];
   }
   private look(env: TownEnvironment, kind: Look["kind"], purpose: "work" | "school" | "shop" | "home" | "walk", r = this.random): Look {
     const warm = (env.temperature ?? 18) >= 25 || env.season === "summer", cold = (env.temperature ?? 18) < 11 || env.season === "winter";
@@ -685,23 +717,14 @@ export class TownLife {
     else if (purpose === "shop") { if (r.next() < .5) { from = r.pick(homes.length ? homes : this.doors); to = r.pick(shops.length ? shops : this.doors); } else { from = r.pick(shops.length ? shops : this.doors); to = r.pick(homes.length ? homes : this.doors); } }
     else { from = r.pick(homes.length ? homes : this.doors); to = r.pick(this.doors); }
     if (!from || !to || from.tile === to.tile && purpose !== "walk") return;
-    const path = this.route(from.road, to.road);
-    if (!path) return;
-    const points: Point[] = [this.doorPoint(from)];
-    const side = r.next() < .5 ? 1 : -1;
-    if (path.length === 1) points.push({ x: path[0]! % MAP_SIZE + .5, y: Math.floor(path[0]! / MAP_SIZE) + .5 });
-    else {
-      // Walk on the sidewalk: the road centreline, offset to one side of the direction of travel.
-      const steps = (path.length - 1) * 6;
-      for (let j = 0; j <= steps; j++) {
-        const q = sampleTransportPath(path, j / 6), length = Math.hypot(q.dx, q.dy) || 1;
-        points.push({ x: q.x + q.dy / length * .3 * side, y: q.y - q.dx / length * .3 * side });
-      }
-    }
-    points.push(this.doorPoint(to));
+    const points = this.sidewalks(from, to);
+    if (!points) return;
     const { lengths, total } = polyline(points);
-    const speed = (kind === "jogger" ? .55 : kind === "child" ? .3 : kind === "elder" ? .17 : .24) * (.9 + r.next() * .2) * (env.rain > .5 ? 1.15 : 1);
-    this.walkers.push({ points, lengths, total, s: 0, speed, look: this.look(env, kind, purpose), seed: Math.floor(r.next() * 1e6), phase: r.next() * TAU });
+    // About one in six goes by bicycle (school children, shoppers, commuters to the station), not in heavy rain or snow.
+    const bike = kind !== "jogger" && kind !== "elder" && env.rain < .5 && env.snow < .3 && r.next() < .17 ? r.pick(["#3f6f9a", "#c8786c", "#e6e2d6", "#4f7f62", "#2f3437"]) : null;
+    const speed = (bike ? .52 : kind === "jogger" ? .55 : kind === "child" ? .3 : kind === "elder" ? .17 : .24) * (.9 + r.next() * .2) * (env.rain > .5 ? 1.15 : 1);
+    const look = this.look(env, kind, purpose); if (bike) { look.dog = null; look.parasol = false; }
+    this.walkers.push({ points, lengths, total, s: 0, speed, look, seed: Math.floor(r.next() * 1e6), phase: r.next() * TAU, pause: 0, face: 1, passed: [], bike });
   }
   private spawnVisitor(env: TownEnvironment): Visitor | undefined {
     if (!this.parks.length) return;
@@ -732,7 +755,13 @@ export class TownLife {
     if (!this.started && this.doors.length > 1) {
       // Open the town mid-day rather than empty: people are already on their way, part-way along.
       this.started = true;
-      for (let j = 0; j < walkers; j++) { this.spawnWalker(env); const w = this.walkers[this.walkers.length - 1]; if (w) w.s = r.next() * w.total * .9; }
+      for (let j = 0; j < walkers; j++) {
+        this.spawnWalker(env); const w = this.walkers[this.walkers.length - 1]; if (!w) continue;
+        w.s = r.next() * w.total * .9;
+        // Nobody starts out in the middle of the road: those would be standing on a crossing wait at its curb.
+        let k = 0; while (k < w.lengths.length - 2 && w.lengths[k + 1]! <= w.s) k++;
+        if (w.points[k + 1]?.cross) w.s = Math.max(0, w.lengths[k]! - .03);
+      }
       for (let j = 0; j < visitors; j++) {
         const v = this.spawnVisitor(env); if (!v) continue;
         v.age = 1 + r.next() * v.life * .5; v.path = [];
@@ -745,8 +774,60 @@ export class TownLife {
       if (this.visitors.length < visitors) this.spawnVisitor(env);
       this.spawnClock = (this.walkers.length < walkers * .6 ? .15 : .4) + r.next() * .4;
     }
-    for (const w of this.walkers) { w.s += w.speed * dt; w.phase += dt * (w.look.kind === "jogger" ? 15 : 9.5); }
+    this.crossing = new Map();
+    for (const w of this.walkers) {
+      // Standing at a post box (posting a letter) or a vending machine (and walking on with a drink).
+      if (w.pause > 0) {
+        w.pause -= dt;
+        if (w.look.carry === "letter" && w.pause < .7) w.look.carry = undefined;
+        if (w.pause <= 0 && w.passed.length && this.stops[w.passed[w.passed.length - 1]!]?.kind === "vending") { w.look.carry = "drink"; w.look.carryColor = r.pick(["#e9473f", "#f1ebdc", "#3f78b5", "#e5b62c"]); }
+        continue;
+      }
+      // Wait at a level crossing while the barrier is down.
+      if (this.closed.size) {
+        const here = at(w, w.s), next = at(w, Math.min(w.total, w.s + .22)), tile = Math.floor(next.y) * MAP_SIZE + Math.floor(next.x);
+        if (this.closed.has(tile) && tile !== Math.floor(here.y) * MAP_SIZE + Math.floor(here.x)) continue;
+      }
+      const step = w.speed * dt;
+      let j = 0; while (j < w.lengths.length - 2 && w.lengths[j + 1]! <= w.s) j++;
+      const end = w.points[j + 1], after = w.points[j + 2];
+      // On the road: the cars wait.
+      if (end?.cross) { const key = `${end.cross.tile}:${end.cross.arm}`; this.crossing.set(key, (this.crossing.get(key) ?? 0) + 1); }
+      // At the curb (or the corner between two crossings): wait for the walk light and for the cars.
+      if (end && after?.cross && w.s + step >= w.lengths[j + 1]! - .03 && !this.mayCross(after.cross, Math.abs(after.x - end.x) > Math.abs(after.y - end.y) ? "x" : "y")) {
+        w.s = Math.max(w.s, Math.min(w.s + step, w.lengths[j + 1]! - .03)); w.phase = 0; continue;
+      }
+      if (this.stops.length && w.look.kind !== "jogger" && !w.bike) {
+        const p = at(w, w.s);
+        for (const [k, stop] of this.stops.entries()) {
+          if (w.passed.includes(k) || Math.abs(p.x - stop.x) > .14 || Math.abs(p.y - stop.y) > .14) continue;
+          w.passed.push(k);
+          if (hash(w.seed * .37 + k * 7.1) < (stop.kind === "postbox" ? .25 : .2) && !w.look.carry) {
+            w.pause = 1.6 + hash(w.seed + k) * 1.2; w.face = stop.dx + stop.dy > 0 ? 1 : -1;
+            if (stop.kind === "postbox") w.look.carry = "letter";
+          }
+        }
+        if (w.pause > 0) continue;
+      }
+      w.s += step; w.phase += dt * (w.look.kind === "jogger" ? 15 : 9.5);
+    }
     this.walkers = this.walkers.filter(w => w.s < w.total);
+    // Passengers gather at the bus stops and get on when a bus stands there.
+    for (const q of this.queues) {
+      const max = q.shelter ? 3 : 2;
+      if (this.boarding.get(q.tile) === q.side) {
+        // One after another through the door while the bus stands there.
+        if (!q.boarding) { q.boarding = true; q.clock = .35; }
+        q.clock -= dt; if (q.clock <= 0 && q.count > 0) { q.count--; q.looks.shift(); q.clock = .5; }
+        continue;
+      }
+      if (q.boarding) { q.boarding = false; q.clock = 4 + r.next() * 6; }
+      q.clock -= dt * Math.max(.15, env.activity);
+      if (q.clock <= 0) {
+        if (q.count < max) { q.count++; q.looks.push(this.look(env, r.next() < .15 ? "child" : r.next() < .25 ? "elder" : "adult", r.next() < .5 ? "work" : "shop")); }
+        q.clock = 5 + r.next() * 9;
+      }
+    }
     for (const v of this.visitors) {
       v.age += dt; v.phase += dt * 9;
       const spot = v.spot ? this.spots.get(v.spot) : undefined;
@@ -825,17 +906,32 @@ export class TownLife {
     const detail = zoom > 1.25, rain = env.rain > .2 || env.snow > 0;
     for (const w of this.walkers) {
       const p = at(w, w.s), fade = Math.min(1, w.s / .15, (w.total - w.s) / .15);
-      const z = elevationAt(town, p.x, p.y, "road"), screen = iso(p.x, p.y, z), facing = p.dy + p.dx > 0 ? 1 : -1;
-      add(p.x, p.y, .02, c => {
+      // Up on a footbridge people are drawn over its deck.
+      const z = elevationAt(town, p.x, p.y, "road") + p.z, screen = iso(p.x, p.y, z), facing = w.pause > 0 ? w.face : p.dy + p.dx > 0 ? 1 : -1;
+      add(p.x, p.y, p.z > 1 ? .62 : .02, c => {
         if (fade < 1) { c.save(); c.globalAlpha *= Math.max(0, fade); }
         if (w.look.dog) {
-          const back = at(w, Math.max(0, w.s - .14)), dz = elevationAt(town, back.x, back.y, "road"), dog = iso(back.x + p.dy * .06, back.y - p.dx * .06, dz);
+          const back = at(w, Math.max(0, w.s - .14)), dz = elevationAt(town, back.x, back.y, "road") + back.z, dog = iso(back.x + p.dy * .06, back.y - p.dx * .06, dz);
           stroke(c, screen.x - 1.3 * w.look.scale, screen.y - 3.6, dog.x, dog.y - 2.6, shade("#5a5046", night), .3);
           drawDog(c, dog, iso(p.dx, p.dy).x >= 0 ? 1 : -1, w.phase * 1.4, night, w.look.dog, { wag: w.phase * 2 });
         }
-        drawPerson(c, screen, w.look, w.phase, facing, night, { rain, detail });
+        if (w.bike) {
+          // The rider sits on the saddle, legs on the pedals.
+          const seat = drawBicycle(c, screen, p.dx, p.dy, w.phase, night, w.bike);
+          drawPerson(c, seat, w.look, w.phase, facing, night, { rain: false, detail, pose: "ride", side: iso(p.dx, p.dy).x >= 0 ? 1 : -1 });
+        } else drawPerson(c, screen, w.look, w.phase, facing, night, { rain, detail });
         if (fade < 1) c.restore();
       }, { left: -10, top: -18, width: 20, height: 22 });
+    }
+    // People waiting at the bus stops: one sits on the shelter bench, the others stand facing the road. Inside a
+    // shelter that faces away they are seen through its glass back.
+    for (const q of this.queues) for (let k = 0; k < q.count; k++) {
+      const look = q.looks[k]; if (!look) continue;
+      const sit = q.shelter && k === 0, spread = q.shelter ? [0, -.1, .1][k] ?? 0 : (k - .5) * .1, front = q.toRoad.dx + q.toRoad.dy > 0;
+      const x = q.x + q.along.dx * spread - (sit ? q.toRoad.dx * .055 : 0), y = q.y + q.along.dy * spread - (sit ? q.toRoad.dy * .055 : 0);
+      const center = { x: q.x - q.toRoad.dx * .03, y: q.y - q.toRoad.dy * .03 }, depth = q.shelter ? center.x + center.y + (front ? .15 : -.15) - x - y : .05;
+      const z = elevationAt(town, x, y, "road"), screen = iso(x, y, z + (sit ? 4.6 : 0)), sway = sit ? 0 : Math.sin(this.time * .8 + k * 2.1 + q.tile) * .3;
+      add(x, y, depth, c => drawPerson(c, { x: screen.x + sway, y: screen.y }, look, 0, front ? 1 : -1, night, { rain: rain && !q.shelter, detail, sit }), { left: -10, top: -18, width: 20, height: 22 });
     }
     const lawnCells = new Map<number, Visitor[]>(), riders = new Map<number, (Rider | undefined)[]>();
     for (const v of this.visitors) {

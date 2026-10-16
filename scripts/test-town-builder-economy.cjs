@@ -171,6 +171,23 @@ function apiWithSession(session) {
       assert.equal(undo.balance, after.balance + cost);
     }
   });
+  await test('a level crossing costs 90 white coins over a straight railway or road, and undo restores the line (0146)', async () => {
+    const start = await snapshot();
+    for (let x = 2; x <= 8; x++) for (let y = 19; y <= 22; y++) assert.equal(start.town.tiles[g.indexAt(x, y)], 'grass');
+    const railed = await edit(t => g.buildLine(t, 'rail', g.lineTiles(g.indexAt(2, 20), g.indexAt(8, 20))));
+    const crossed = await edit(t => g.buildLine(t, 'road', g.lineTiles(g.indexAt(5, 19), g.indexAt(5, 22))));
+    const i = g.indexAt(5, 20);
+    assert.equal(crossed.town.tiles[i], 'crossing'); assert.equal(crossed.balance, railed.balance - 3 * 35 - 90);
+    // A home whose only road is the crossing is on a road; a crossing on the river is refused.
+    await edit(t => g.buildTile(t, 'bulldoze', 6, 20));
+    const home = await edit(t => g.buildTile(t, 'house', 6, 20));
+    assert.equal(home.town.tiles[g.indexAt(6, 20)], 'house');
+    const river = structuredClone(home.town), water = river.terrain.findIndex(Boolean); river.tiles[water] = 'crossing';
+    await expectError(() => action('edit', { p_town: river }), 'INVALID_TOWN');
+    for (let n = 0; n < 4; n++) await action('undo');
+    const undone = await snapshot();
+    assert.deepEqual(undone.town.tiles, start.town.tiles); assert.equal(undone.balance, start.balance); assert.equal(undone.xp, start.xp);
+  });
   await test('park land, every park part, layered paths and expansion have exact server prices', async () => {
     await edit(t => g.buyParkLot(t, 3, 12, 'small'));
     const id = g.indexAt(3, 12);
@@ -186,16 +203,35 @@ function apiWithSession(session) {
   });
   await test('all compatible facility parts are charged on the correct building only', async () => {
     for (const part of g.FACILITY_PARTS) for (const kind of part.kinds) {
-      let state = await snapshot(), tile = state.town.tiles.indexOf(kind);
-      if (tile < 0) {
+      let state = await snapshot(), tile = state.town.tiles.findIndex((t, i) => t === kind && !g.roadPartProblem(state.town, i, part.id)), stub = false;
+      if (tile < 0 && kind === 'road') {
+        // A short side road makes a T junction for the parts that belong at one.
+        state = await edit(t => g.buildTile(t, 'road', 12, 11)); stub = true;
+        tile = state.town.tiles.findIndex((t, i) => t === kind && !g.roadPartProblem(state.town, i, part.id));
+      } else if (tile < 0) {
         state = await edit(t => g.buildTile(t, kind, 11, 11)); tile = g.indexAt(11, 11);
       }
       const installed = await edit(t => g.buyFacilityPart(t, tile, part.id));
-      assert(installed.town.attachments.find(a => a.tile === tile).parts.includes(part.id));
+      assert(installed.town.attachments.find(a => a.tile === tile).parts.includes(part.id), part.id);
       await action('undo');
-      // Remove temporary test station/factory, keeping land available for the next kind.
-      if (tile === g.indexAt(11, 11)) await action('undo');
+      // Remove temporary test station/factory or side road, keeping land available for the next kind.
+      if (tile === g.indexAt(11, 11) || stub) await action('undo');
     }
+  });
+  await test('a straight road takes every part that fits it at once; forged unknown or excess parts are refused (0146)', async () => {
+    const state = await snapshot(), tile = state.town.tiles.findIndex((t, i) => t === 'road' && g.roadShape(state.town.tiles, i).shape === 'straight');
+    const road = g.FACILITY_PARTS.filter(p => p.kinds.includes('road')).map(p => p.id);
+    const before = state.balance;
+    let last = state;
+    for (const id of road) { const next = g.buyFacilityPart({ ...last.town, money: last.balance }, tile, id); if (next.town.money !== last.balance) last = await edit(() => next); }
+    const parts = last.town.attachments.find(a => a.tile === tile).parts;
+    assert.deepEqual([...parts].sort(), ['crosswalk', 'guardrail', 'light', 'paving', 'pole', 'postbox', 'roadTrees', 'signal', 'vending']);
+    assert.equal(before - last.balance, parts.reduce((sum, id) => sum + g.FACILITY_PARTS.find(p => p.id === id).price, 0));
+    const forged = structuredClone(last.town); forged.attachments.find(a => a.tile === tile).parts.push('rocket');
+    await expectError(() => action('edit', { p_town: forged }), 'INVALID_TOWN');
+    const crowded = structuredClone(last.town); crowded.attachments.find(a => a.tile === tile).parts = road;
+    await expectError(() => action('edit', { p_town: crowded }), 'INVALID_TOWN');
+    while ((await snapshot()).balance !== before) await action('undo');
   });
   await test('my home costs 500 white coins, needs a road and stays unique even against forged saves', async () => {
     const before = await snapshot(), tile = g.indexAt(12, 11);
@@ -226,6 +262,22 @@ function apiWithSession(session) {
     const metrics = rpg.townQuestMetrics(town);
     for (const quest of rpg.TOWN_QUESTS) assert.equal(await rpc('town_quest_metric', { p_town: town, p_id: quest.id }), metrics[quest.id], quest.id);
     assert.equal(metrics.railway, 2);
+    // Level crossings (0146): trains run through them along the track only, and homes beside them count as on a road.
+    let crossing = g.createTown(false); crossing.money = 1e6;
+    crossing = g.buildLine(crossing, 'rail', g.lineTiles(g.indexAt(3, 8), g.indexAt(11, 8))).town;
+    for (const x of [2, 12]) crossing = g.buildTile(crossing, 'station', x, 8).town;
+    crossing = g.buildLine(crossing, 'road', g.lineTiles(g.indexAt(6, 5), g.indexAt(6, 11))).town;
+    crossing = g.buildLine(crossing, 'road', g.lineTiles(g.indexAt(7, 5), g.indexAt(7, 11))).town;
+    crossing = g.buildTile(crossing, 'house', 5, 7).town;
+    // Stations on a second track that touches the first only through the road must not count as linked.
+    for (const x of [4, 9]) crossing = g.buildTile(crossing, 'station', x, 12).town;
+    crossing = g.buildLine(crossing, 'rail', g.lineTiles(g.indexAt(5, 12), g.indexAt(8, 12))).town;
+    const forged = structuredClone(crossing); forged.tiles[g.indexAt(6, 11)] = 'crossing'; forged.tiles[g.indexAt(6, 12)] = 'crossing';
+    for (const sample of [crossing, forged]) {
+      const values = rpg.townQuestMetrics(sample);
+      for (const quest of rpg.TOWN_QUESTS) assert.equal(await rpc('town_quest_metric', { p_town: sample, p_id: quest.id }), values[quest.id], quest.id);
+    }
+    assert.equal(crossing.tiles[g.indexAt(6, 8)], 'crossing'); assert.equal(rpg.townQuestMetrics(crossing).railway, 4); assert(rpg.townQuestMetrics(crossing).people >= 18);
   });
   await test('quest claims, daily support and daily building rewards are idempotent', async () => {
     const before = await snapshot(), daily = await action('daily');
