@@ -22,9 +22,11 @@ export const paintState = {
   /** Wisteria in bloom (0..1) and the flowers of the seasonal flower beds; "default" is the shop icon's spring look. */
   wisteria: 0,
   flora: "default" as "default" | "tulip" | "hydrangea" | "sunflower" | "cosmos" | "pansy",
+  /** Tanabata (late June to 7 July): wishes on paper strips hang from the park bamboo. */
+  tanabata: false,
 };
 export function resetPaintState() {
-  Object.assign(paintState, { litThreshold: .25, shopsOpen: true, snow: false, season: "default", blossom: 0, foliage: 0, bare: 0, lush: 0, liveClocks: false, liveParts: false, wisteria: 0, flora: "default" });
+  Object.assign(paintState, { litThreshold: .25, shopsOpen: true, snow: false, season: "default", blossom: 0, foliage: 0, bare: 0, lush: 0, liveClocks: false, liveParts: false, wisteria: 0, flora: "default", tanabata: false });
 }
 
 /** Multiplied into everything that is not a light source once it is fully dark. */

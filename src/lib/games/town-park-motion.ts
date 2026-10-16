@@ -62,8 +62,8 @@ export const PART_SPOTS: Partial<Record<ParkPart, SpotDef[]>> = {
 
 /** The carousel turns while the shops are open, unless it is raining hard. */
 export const carouselRunning = (env: TownEnvironment) => env.shopsOpen && env.rain < .5 && env.snow < .5;
-/** Water play runs on warm summer days. */
-export const splashActive = (env: TownEnvironment) => env.night < .45 && env.rain < .2 && env.snow === 0 && (env.temperature ?? 24) >= 21 && (env.season === "summer" || (env.temperature ?? 0) >= 26);
+/** Water play runs on warm summer days; the rest of the year the pad is drained. */
+export const splashActive = (env: TownEnvironment) => env.night < .45 && env.rain < .2 && env.snow === 0 && (env.temperature ?? 24) >= 21 && env.season === "summer";
 /** The band plays from 11:00 to 20:00 when it is dry. */
 export const performing = (env: TownEnvironment) => { const h = env.minutes / 60; return h >= 11 && h < 20 && env.rain < .2 && env.snow === 0; };
 /** Carp streamers fly from April to Children's Day (5 May), a few days either side. */
@@ -71,6 +71,12 @@ export function koinoboriSeason(env: TownEnvironment) {
   const d = new Date(env.time + 9 * 3600_000), month = d.getUTCMonth() + 1, day = d.getUTCDate();
   return month === 4 || month === 5 && day <= 10;
 }
+/** Month * 100 + day in Japan time. */
+const monthDay = (env: TownEnvironment) => { const d = new Date(env.time + 9 * 3600_000); return (d.getUTCMonth() + 1) * 100 + d.getUTCDate(); };
+/** Tanabata: wishes hang on the bamboo from late June to the night of 7 July. */
+export const tanabataSeason = (env: TownEnvironment) => monthDay(env) >= 625 && monthDay(env) <= 707;
+/** The park trees are lit for Christmas through December up to the 25th, from dusk. */
+export const illuminationSeason = (env: TownEnvironment) => monthDay(env) >= 1201 && monthDay(env) <= 1225;
 export function spotOpen(kind: SpotKind, env: TownEnvironment) {
   if (kind === "carousel") return carouselRunning(env);
   if (kind === "splash") return splashActive(env);

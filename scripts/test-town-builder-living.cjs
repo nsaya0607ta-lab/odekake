@@ -300,4 +300,98 @@ test('kites need wind, picnics need a dry day, and pigeons on the plaza take off
   life.update(1 / 30, 1 / 30, calm);
   assert(bird.fly, 'The pigeon flies away from a running child');
 });
+const paths = load('src/lib/games/town-park-paths.ts');
+test('a park has one gate on each side that faces a road, on a free tile near the middle of that side', () => {
+  const town = parkTown(['bench', null, null, 'fountain', 'pond', 'tree', 'swings', 'seesaw', null, null, null, null]), idx = game.indexAt;
+  for (let x = 2; x <= 14; x++) town.tiles[idx(x, 11)] = 'road';
+  for (let y = 7; y <= 11; y++) town.tiles[idx(8, y)] = 'road';
+  const lot = town.parks[0], gates = paths.parkGates(lot, town.tiles);
+  assert.deepEqual(gates.map(g => [g.dx, g.dy]).sort(), [[0, 1], [1, 0]], 'The bottom side and the right side face roads');
+  assert.equal(gates.find(g => g.dy === 1).cell, idx(5, 10), 'Bottom side: the middle tile (both middle tiles are free, the first wins)');
+  assert.equal(gates.find(g => g.dx === 1).cell, idx(7, 10), 'Right side: the middle tile has seesaw parts, so the free tile below is used');
+  assert.deepEqual(paths.parkGates(parkTown([]).parks[0], parkTown([]).tiles), [], 'No road, no gate');
+});
+test('park visitors walk round ponds, fountains and play equipment instead of through them', () => {
+  const town = parkTown(['carousel', 'pond', 'fountain', 'jungleGym', null, 'bandstand', null, 'splashPad', 'windmill', 'flowerField', 'foodCart', 'basketball']);
+  const life = new TownLife(), day = env('2026-08-01', 13, { weather: weather('clear', { temp: 30 }) }), lot = town.parks[0];
+  const blocked = new Set(lot.parts.map(p => p.tile)), started = new Map();
+  life.sync(town, new Map());
+  let walking = 0;
+  for (let j = 0; j < 9000; j++) {
+    life.update(1 / 30, 1 / 30, day);
+    for (const v of life.visitors) {
+      if (started.get(v) !== v.path) started.set(v, v.path), v.from = Math.floor(v.y) * 24 + Math.floor(v.x);
+      if (!v.path?.length || v.spot && v.using >= 0) continue;
+      walking++;
+      const cell = Math.floor(v.y) * 24 + Math.floor(v.x), fx = v.x % 1, fy = v.y % 1;
+      if (!blocked.has(cell) || cell === v.from || cell === Math.floor(v.ty) * 24 + Math.floor(v.tx)) continue;
+      assert(Math.min(fx, 1 - fx, fy, 1 - fy) <= .07, `Walking through the ${lot.parts.find(p => p.tile === cell).kind} at ${v.x.toFixed(2)},${v.y.toFixed(2)}`);
+    }
+  }
+  assert(walking > 1000, 'People walked round the park');
+  const w = paths.parkWays(lot, town.tiles), route = paths.parkRoute(w, { x: 5.5, y: 9.5 }, { x: 7.5, y: 8.3 });
+  assert(route.length > 1, 'A walk across the full park goes round, not straight');
+  assert.deepEqual(route[route.length - 1], { x: 7.5, y: 8.3 });
+});
+test('visitors come along the sidewalk and in through the gate, and leave the same way', () => {
+  const town = parkTown(['swings', 'bench', 'fountain', null, null, 'seesaw', null, 'picnic', null, null, null, null]), idx = game.indexAt;
+  for (let x = 2; x <= 14; x++) town.tiles[idx(x, 11)] = 'road';
+  const lot = town.parks[0], life = new TownLife(), day = env('2026-08-01', 10, { weather: weather('clear', { temp: 26 }) });
+  life.sync(town, new Map());
+  const gate = paths.parkWays(lot, town.tiles).gates[0];
+  let arrived = 0, left = 0, faded = 0;
+  for (let j = 0; j < 12000; j++) {
+    life.update(1 / 30, 1 / 30, day);
+    for (const v of life.visitors) {
+      const outside = v.y > lot.y + lot.height;
+      if (outside) assert(Math.abs(v.y - gate.outside.y) < 1e-6 || Math.abs(v.x - gate.outside.x) < .01, 'Outside the park, people keep to the sidewalk or the gate');
+      if (outside && v.age < .1) arrived++;
+      if (v.leaving && outside && v.path.length === 1) left++;
+      if (!outside && !v.spot && !v.leaving && v.age > v.life + 1) faded++;
+    }
+  }
+  assert(arrived > 3, 'People arrive along the sidewalk'); assert(left > 3, 'People leave through the gate');
+  assert.equal(faded, 0, 'Nobody lingers in a park with a gate after their visit');
+});
+test('the water play pad is drained outside the summer, and Tanabata wishes hang on the bamboo from late June to 7 July', () => {
+  const colors = (kind, state) => { const rec = recordingContext(); Object.assign(paint.paintState, state); art.drawParkArt(rec.c, kind, 5, 5, 0, false, 0); paint.resetPaintState(); return rec.fills.map(f => typeof f.color === 'string' ? f.color : ''); };
+  assert(colors('splashPad', { season: 'summer' }).includes('#8fcadb'), 'Water in the summer');
+  for (const season of ['spring', 'autumn', 'winter']) assert(!colors('splashPad', { season }).includes('#8fcadb'), `Drained in ${season}`);
+  assert(colors('splashPad', { season: 'default' }).includes('#8fcadb'), 'The shop icon shows the water');
+  assert(!motion.splashActive(env('2026-05-20', 13, { weather: weather('clear', { temp: 29 }) })), 'No water play on a hot day in May: the pad is still drained');
+  assert(colors('bamboo', { season: 'summer', tanabata: true }).length > colors('bamboo', { season: 'summer' }).length + 10, 'Paper wishes, a chain and streamers');
+  for (const [date, on] of [['2026-06-24', false], ['2026-06-25', true], ['2026-07-07', true], ['2026-07-08', false]]) assert.equal(motion.tanabataSeason(env(date, 12)), on, date);
+  for (const [date, on] of [['2026-11-30', false], ['2026-12-01', true], ['2026-12-25', true], ['2026-12-26', false]]) assert.equal(motion.illuminationSeason(env(date, 20)), on, date);
+});
+test('on a snowy day children build snowmen and throw snowballs; the snowmen melt when the snow stops', () => {
+  const town = parkTown(['swings', null, null, null, null, null, null, null, null, null, null, 'bench']);
+  const life = new TownLife(), snowy = env('2027-01-20', 11, { weather: weather('snow', { temp: -1, precip: .6 }) });
+  life.sync(town, new Map());
+  const games = new Set();
+  for (let j = 0; j < 20000 && life.snowmen.size === 0; j++) {
+    life.update(1 / 30, 1 / 30, snowy);
+    for (const v of life.visitors) if (v.lawn) { games.add(v.lawn); assert.equal(v.look.kind, 'child', 'Snow games are for children'); }
+  }
+  assert(life.snowmen.size > 0, 'A snowman is built');
+  for (let j = 0; j < 3000; j++) { life.update(1 / 30, 1 / 30, snowy); for (const v of life.visitors) if (v.lawn) games.add(v.lawn); }
+  assert(![...games].some(g => !['snowman', 'snowball'].includes(g)), 'No picnics or kites in the snow');
+  assert([...life.snowmen.values()].some(size => size > .5), 'The snowman grows while children work on it');
+  const draws = []; life.collect((x, y, depth, paint) => draws.push(paint), town, snowy, 0, 3);
+  const rec = recordingContext(); for (const d of draws) d(rec.c); assert(rec.fills.some(f => f.color === '#f7fafc'), 'The snowman is drawn');
+  const dry = env('2027-01-20', 11, { weather: weather('clear', { temp: 4 }) });
+  for (let j = 0; j < 30 * 8; j++) life.update(1 / 30, 1 / 30, dry);
+  assert.equal(life.snowmen.size, 0, 'The snowmen melt once the snow stops');
+  assert(!life.visitors.some(v => v.lawn === 'snowman' || v.lawn === 'snowball'), 'Snow games end with the snow');
+});
+test('park trees are lit with twinkling lights from dusk in December, and a park pine gets a star', () => {
+  const town = parkTown(['pine', 'tree', 'cherry', 'maple', 'ginkgo', null, null, null, null, null, null, null]);
+  const life = new TownLife();
+  life.sync(town, new Map());
+  const lights = (date, hours) => { const e = env(date, hours), rec = recordingContext(); life.update(1 / 30, 1 / 30, e); life.collect((x, y, depth, paint) => paint(rec.c), town, e, e.night, 3); return rec.fills.filter(f => f.op === 'lighter').map(f => f.color); };
+  const december = lights('2026-12-15', 19.5);
+  assert(december.includes('#ffe066'), 'A star on top of the pine');
+  assert(december.filter(c => c === '#ffe3a0').length > 40, 'Warm white lights on the other trees');
+  assert.equal(lights('2026-12-15', 13).length, 0, 'Not in the daytime');
+  assert.equal(lights('2026-11-15', 19.5).length, 0, 'Not before December');
+});
 console.log(`${passed} living town checks passed`);
