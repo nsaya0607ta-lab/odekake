@@ -3,7 +3,6 @@ import Image from "next/image";
 import { PageBody } from "@/components/page-body";
 import { TopHeader } from "@/components/page-header";
 import { canSeeMemoryGame } from "@/lib/games/memory-game-access";
-import { canSeeTownBuilder } from "@/lib/games/town-builder-access";
 import { requireUser } from "@/lib/supabase/server";
 
 export const metadata = { title: "ミニゲーム | おでかけ記録" };
@@ -15,11 +14,11 @@ const SNACK_TRAIL_CARD_SRC = "/games/snack-trail/menu-icon-preview.webp";
 const MEMORY_GAME_CARD_SRC = "/collection/items/duck-plush.webp";
 const OSANPO_RUN_CARD_SRC = "/games/osanpo-run/menu-icon.webp";
 const PINBALL_CARD_SRC = "/games/pinball/menu-icon.webp";
+const TOWN_BUILDER_CARD_SRC = "/launcher/icons/town-builder.webp";
 
 export default async function GamesPage() {
-  const { supabase, user } = await requireUser();
+  const { user } = await requireUser();
   const canSeeMemoryGamePreview = canSeeMemoryGame(user.displayName);
-  const canSeeTownBuilderPreview = (await canSeeTownBuilder(user.displayName, supabase));
 
   return (
     <>
@@ -40,7 +39,7 @@ export default async function GamesPage() {
         </section>
 
         <section className="space-y-4" aria-label="ゲーム一覧">
-          {canSeeTownBuilderPreview && <Link
+          <Link
             href="/games/town-builder"
             aria-label="ぼくのまちづくりで遊ぶ"
             className="pressable group relative block overflow-hidden rounded-[30px] border border-[#a7cebb] bg-gradient-to-br from-[#f4fff2] via-[#e5f6e7] to-[#d2ece6] p-5 text-ink shadow-[0_14px_34px_rgba(69,132,87,0.15)] transition-transform active:scale-[0.985]"
@@ -55,7 +54,17 @@ export default async function GamesPage() {
                 <span className="mt-1 block text-[21px] font-black tracking-[-0.03em]">ぼくのまちづくり</span>
                 <span className="mt-1.5 block text-[11px] font-bold leading-relaxed text-ink-soft">クエストを達成してレベルアップ。小さな街の物語を育てよう。</span>
               </span>
-              <span className="flex h-[108px] w-[108px] shrink-0 items-center justify-center rounded-[25px] border border-white/80 bg-gradient-to-b from-[#bce4ce] to-[#8dc9af] text-6xl shadow-[0_8px_18px_rgba(80,66,46,0.09)]" aria-hidden="true">🏘️</span>
+              <span className="relative h-[108px] w-[108px] shrink-0 overflow-hidden rounded-[25px] border border-white/80 bg-white/65 shadow-[0_8px_18px_rgba(80,66,46,0.09)]">
+                <Image
+                  src={TOWN_BUILDER_CARD_SRC}
+                  alt=""
+                  aria-hidden="true"
+                  fill
+                  sizes="108px"
+                  className="object-cover"
+                />
+                <span aria-hidden="true" className="absolute inset-x-0 top-0 h-1/3 bg-gradient-to-b from-white/20 to-transparent" />
+              </span>
             </span>
             <span className="relative z-10 mt-4 flex items-center justify-between rounded-[18px] border border-white/90 bg-white/65 px-3 py-2.5">
               <span className="flex items-center gap-4 text-[11px] font-black text-[#457958]">
@@ -63,7 +72,7 @@ export default async function GamesPage() {
               </span>
               <span className="ml-2 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#3a805e] text-xl font-black text-white">›</span>
             </span>
-          </Link>}
+          </Link>
           <Link
             href="/games/item-catch"
             aria-label="アイテムキャッチで遊ぶ"

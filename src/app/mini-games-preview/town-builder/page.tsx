@@ -1,12 +1,10 @@
-import { notFound, redirect } from "next/navigation";
-import { canSeeTownBuilder } from "@/lib/games/town-builder-access";
+import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
-/** 旧体験版のURLにも同じ制限を適用し、本人の保存データを使う本体へ送る。 */
+/** 旧体験版のURLもログインを求めてから、本人の保存データを使う本体へ送る。 */
 export default async function TownPreviewPage() {
-  const { supabase, user } = await requireUser();
-  if (!(await canSeeTownBuilder(user.displayName, supabase))) notFound();
+  await requireUser();
   redirect("/games/town-builder");
 }

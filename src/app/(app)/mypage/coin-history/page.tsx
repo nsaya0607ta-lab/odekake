@@ -7,7 +7,6 @@ import type { CoinEventRow, Json } from "@/lib/supabase/types";
 import { requireUser } from "@/lib/supabase/server";
 import { WhiteCoinSection } from "@/components/white-coin-section";
 import { getWhiteCoinBalance, getWhiteCoinEvents } from "@/lib/data/white-coins";
-import { canSeeTownBuilder } from "@/lib/games/town-builder-access";
 
 export const metadata = { title: "コイン履歴 | おでかけ記録" };
 export const dynamic = "force-dynamic";
@@ -37,7 +36,7 @@ export default async function CoinHistoryPage() {
     <>
       <PageHeader title="コイン獲得履歴" backHref="/mypage/coins" />
       <PageBody>
-        {whiteCoins !== null && <WhiteCoinSection balance={whiteCoins} events={whiteEvents} canPlay={(await canSeeTownBuilder(user.displayName, supabase))} />}
+        {whiteCoins !== null && <WhiteCoinSection balance={whiteCoins} events={whiteEvents} />}
         <section className="rough-card overflow-hidden p-5">
           <p className="text-xs font-bold tracking-[0.08em] text-ink-soft">いま使えるコイン</p>
           <p className="mt-1 flex items-center gap-1.5 text-4xl leading-none font-bold tabular-nums">

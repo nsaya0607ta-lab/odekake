@@ -6,6 +6,7 @@ const ts = require('typescript');
 // Exercise the real server pages and middleware with authenticated-session fixtures.
 // Next's redirect/notFound control flow is represented by distinct thrown errors.
 let session = { id: 'shun-account', displayName: 'しゅん' };
+let rpcCalls = 0;
 let pathname = '/games/town-builder';
 let configured = true;
 const exit = (kind, location) => { throw Object.assign(new Error(kind), { kind, location }); };
@@ -21,7 +22,8 @@ const stubs = {
   '@/components/games/town-builder': { TownBuilder },
   '@/lib/supabase/server': { requireUser: async () => {
     if (!session) exit('redirect', '/login');
-    return { user: session, supabase: { rpc: async () => ({ data: session.id === 'shun-account', error: null }) } };
+    // The town is open to every signed-in account (0147): the pages must not ask the database for a private gate.
+    return { user: session, supabase: { rpc: async () => { rpcCalls++; return { data: false, error: null }; } } };
   } },
   '@/lib/supabase/env': { getSupabaseEnv: () => configured ? { url: 'https://example.test', anonKey: 'test' } : null },
   '@supabase/ssr': { createServerClient: () => ({ auth: { getClaims: async () => ({ data: { claims: session ? { sub: session.id } : null } }) } }) },
@@ -69,34 +71,22 @@ let passed = 0;
 const test = async (name, fn) => { await fn(); passed++; console.log(`PASS ${name}`); };
 
 (async () => {
-  await test('しゅん sees the menu entry and opens the game using their account save key', async () => {
-    const menu = elements(await games());
-    assert(menu.some(e => e.props.href === '/games/town-builder'));
-    assert(elements(await town()).some(e => e.type === TownBuilder && e.props.userId === session.id));
-  });
-  await test('other names do not see the entry and cannot open either URL', async () => {
-    for (const displayName of ['別のユーザー', 'しゅんだ', 'シュン', 'shun', '', null]) {
-      session = { id: 'other-account', displayName };
+  await test('every signed-in account sees the menu entry and opens the game with its own account save key', async () => {
+    for (const [id, displayName] of [['shun-account', 'しゅん'], ['other-account', '別のユーザー'], ['same-name-account', 'しゅん'], ['latin-account', 'shun'], ['blank-account', ''], ['unnamed-account', null]]) {
+      session = { id, displayName };
       const menu = elements(await games());
-      assert(!menu.some(e => e.props.href === '/games/town-builder'));
+      assert(menu.some(e => e.props.href === '/games/town-builder'));
       assert(menu.some(e => e.props.href === '/games/pinball'));
-      await assert.rejects(town(), control('notFound'));
-      await assert.rejects(preview(), control('notFound'));
+      const screen = elements(await town()).filter(e => e.type === TownBuilder);
+      assert.equal(screen.length, 1);
+      assert.equal(screen[0].props.userId, id);
+      await assert.rejects(preview(), control('redirect', '/games/town-builder'));
     }
-  });
-  await test('another account with the same display name cannot see the screen', async () => {
-    session = { id: 'other-account', displayName: 'しゅん' };
-    assert(!elements(await games()).some(e => e.props.href === '/games/town-builder'));
-    await assert.rejects(town(), control('notFound'));
-    await assert.rejects(preview(), control('notFound'));
+    assert.equal(rpcCalls, 0);
   });
   await test('logged-out users never receive a game page or public demo', async () => {
     session = null;
     for (const page of [games, town, preview]) await assert.rejects(page(), control('redirect', '/login'));
-  });
-  await test('the old preview URL sends しゅん to the protected main game', async () => {
-    session = { id: 'shun-account', displayName: 'しゅん' };
-    await assert.rejects(preview(), control('redirect', '/games/town-builder'));
   });
   await test('middleware requires login for game and old preview, including subpaths', async () => {
     session = null;

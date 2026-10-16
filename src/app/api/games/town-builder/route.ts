@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { decodeTownSnapshot, getTownSnapshot, townRpc } from "@/lib/data/town-builder";
 import { createTown, decodeTown } from "@/lib/games/town-builder";
-import { canSeeTownBuilder } from "@/lib/games/town-builder-access";
 import { applyTownCommand, townCommandSchema } from "@/lib/games/town-commands";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { requireUser } from "@/lib/supabase/server";
@@ -13,17 +12,12 @@ const fail = (error: string, status: number) => NextResponse.json({ error }, { s
 
 export async function GET(request: Request) {
   const { supabase, user } = await requireUser();
-  const saved = getTownSnapshot(supabase).catch(() => null);
-  if (!(await canSeeTownBuilder(user.displayName, supabase))) return fail("見つかりません", 404);
   if (new URL(request.url).searchParams.get("account") !== user.id) return fail("アカウントが変わりました。街の画面を開き直してください。", 403);
-  const snapshot = await saved;
+  const snapshot = await getTownSnapshot(supabase).catch(() => null);
   return snapshot ? NextResponse.json({ snapshot }, { headers: noStore }) : fail("街のデータに接続できません。時間をおいて再試行してください。", 503);
 }
 export async function POST(request: Request) {
   const { supabase, user } = await requireUser();
-  // The access check and the saved town are separate round trips to the database; wait for both together.
-  const saved = getTownSnapshot(supabase).catch(() => null);
-  if (!(await canSeeTownBuilder(user.displayName, supabase))) return fail("見つかりません", 404);
   if (request.headers.get("origin") && request.headers.get("origin") !== new URL(request.url).origin) return fail("この操作を受け付けられません。", 403);
   const limit = checkRateLimit(`town:${user.id}`, 90, 60_000);
   if (!limit.allowed) return NextResponse.json({ error: "少し待ってから操作してください。" }, { status: 429, headers: { ...noStore, "Retry-After": String(limit.retryAfterSeconds) } });
@@ -36,7 +30,7 @@ export async function POST(request: Request) {
   if (!parsed.success) return fail("操作を確認できませんでした。", 400);
   const p = parsed.data;
   if (p.userId !== user.id) return fail("アカウントが変わりました。街の画面を開き直してください。", 403);
-  const current = await saved;
+  const current = await getTownSnapshot(supabase).catch(() => null);
   if (!current) return fail("街のデータに接続できません。再試行してください。", 503);
   // Replays still reach the database: it checks the receipt before checking revision.
   let next = current.town, message = "保存しました", lotId: number | undefined;
@@ -65,7 +59,6 @@ export async function POST(request: Request) {
       TOWN_CONFLICT: ["別の画面で街が更新されました。最新の街を読み込みます。", 409],
       TOWN_QUEST_NOT_READY: ["クエストの条件を確認してください。", 400],
       TOWN_UNDO_EMPTY: ["取り消せる工事がありません。", 400],
-      TOWN_NOT_ALLOWED: ["見つかりません", 404],
       TOWN_ALREADY_STARTED: ["保存済みの街を読み込みます。", 409],
       TOWN_HOME_LIMIT: ["マイホームは1軒だけ建てられます。", 400],
       TOWN_ROAD_REQUIRED: ["道路の隣に建ててください。", 400],
