@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { Stage } from "./types";
-import { hintCount, isSecret, secretAnswers, starsFor, type HintKind, type RoundState } from "./engine";
+import { hintCount, isSecret, reconcileRound, secretAnswers, starsFor, type HintKind, type RoundState } from "./engine";
 
 /**
  * 進みぐあい（セーブデータ）と、コイン・経験値・レベル・実績・称号の決まり。
@@ -87,6 +87,27 @@ export function defaultSave(): SaveData {
 export function parseSave(value: unknown): SaveData | null {
   const result = saveSchema.safeParse(value);
   return result.success ? result.data : null;
+}
+
+/** 正解データの変更を引き継ぎ、統合でクリアしたラウンドには通常の報酬を一度だけ渡す。 */
+export function reconcileSave(save: SaveData, stages: Stage[], now: number): SaveData {
+  let next: SaveData = { ...save, rounds: { ...save.rounds }, stages: { ...save.stages } };
+  for (const stage of stages) {
+    const record = next.stages[stage.id];
+    if (record) {
+      const secrets = new Set(secretAnswers(stage).map((answer) => answer.char));
+      next.stages[stage.id] = { ...record, secretsFound: record.secretsFound.filter((char) => secrets.has(char)) };
+    }
+    const round = next.rounds[stage.id];
+    if (!round) continue;
+    const reconciled = reconcileRound(stage, round, now);
+    next.rounds[stage.id] = reconciled;
+    next = completeStage(next, stage, reconciled, now).save;
+  }
+  return {
+    ...next,
+    hintLog: next.hintLog.map((record) => ({ ...record, answer: record.answer === "曰" ? "日" : record.answer })),
+  };
 }
 
 // ---------- 保存先 ----------

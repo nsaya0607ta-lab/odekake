@@ -1,5 +1,5 @@
 import type { Answer, Stage } from "./types";
-import { judgeStrokes, normalizeSelection, verifiedAnswers, type JudgeResult } from "./judge";
+import { equivalentAnswers, judgeStrokes, normalizeSelection, verifiedAnswers, type JudgeResult } from "./judge";
 
 /**
  * 1回のプレイ（ラウンド）の状態と、点数・ヒントの決まり。どれも純粋な関数で、画面から切りはなしてテストできる。
@@ -23,7 +23,7 @@ export const COMBO_STEP = 0.1;
 export const COMBO_MAX_BONUS = 0.5;
 
 /** 答えた記録。text は正解なら字、ちがったら「3画」のような本数 */
-export type InputRecord = { text: string; kind: Exclude<JudgeResult["kind"], "ambiguous">; at: number };
+export type InputRecord = { text: string; kind: JudgeResult["kind"]; at: number };
 
 export type RoundState = {
   stageId: string;
@@ -104,6 +104,25 @@ function markProgress(stage: Stage, round: RoundState, now: number): RoundState 
   return next;
 }
 
+/** 正解の統合を保存済みラウンドにも適用する。獲得済みの点数・報酬はそのまま。 */
+export function reconcileRound(stage: Stage, round: RoundState, now: number): RoundState {
+  const chars = new Set(verifiedAnswers(stage).map((answer) => answer.char));
+  const canonical = (char: string) => char === "曰" && chars.has("日") ? "日" : char;
+  const expand = (list: string[]) => equivalentAnswers(stage, list.map(canonical)).map((answer) => answer.char);
+  const hints: RoundState["hints"] = {};
+  for (const [char, used] of Object.entries(round.hints)) {
+    const target = canonical(char);
+    if (chars.has(target)) hints[target] = [...new Set([...(hints[target] ?? []), ...used])];
+  }
+  return markProgress(stage, {
+    ...round,
+    found: expand(round.found),
+    revealed: expand(round.revealed),
+    hints,
+    history: round.history.map((record) => ({ ...record, text: record.text.replaceAll("曰", "日") })),
+  }, now);
+}
+
 /** 答え1つの点数。ヒントを使った答えは半分、開いた答えは0点 */
 export function pointsFor(answer: Answer, combo: number, hintsUsed: HintKind[]): number {
   if (hintsUsed.includes("reveal")) return 0;
@@ -116,7 +135,12 @@ export type SubmitOutcome = {
   round: RoundState;
   result: JudgeResult | null;
   /** この回答で見つけた答えと、その点数 */
-  gained: { answer: Answer; points: number; secret: boolean } | null;
+  gained: {
+    answer: Answer;
+    points: number;
+    secret: boolean;
+    discoveries: { answer: Answer; points: number; secret: boolean }[];
+  } | null;
   /** この回答でクリアした（見つける字がそろった） */
   cleared: boolean;
   /** この回答でシークレットまで全部そろった */
@@ -124,20 +148,25 @@ export type SubmitOutcome = {
 };
 
 /** えらんだ筆画で答える */
-export function submit(stage: Stage, round: RoundState, selected: Iterable<number>, now: number, answerChar?: string): SubmitOutcome {
+export function submit(stage: Stage, round: RoundState, selected: Iterable<number>, now: number): SubmitOutcome {
   if (round.completedAt !== null) return { round, result: null, gained: null, cleared: false, completed: false };
   const picked = normalizeSelection(stage, selected);
-  const result = judgeStrokes(stage, picked, new Set(round.found), answerChar);
-  if (result.kind === "empty" || result.kind === "ambiguous") return { round, result, gained: null, cleared: false, completed: false };
+  const result = judgeStrokes(stage, picked, new Set(round.found));
+  if (result.kind === "empty") return { round, result, gained: null, cleared: false, completed: false };
 
   let next: RoundState = { ...round };
   let gained: SubmitOutcome["gained"] = null;
   if (result.kind === "correct") {
-    const points = pointsFor(result.answer, round.combo, round.hints[result.answer.char] ?? []);
-    gained = { answer: result.answer, points, secret: isSecret(result.answer) };
+    const discoveries = result.answers.map((answer) => ({
+      answer,
+      points: pointsFor(answer, round.combo, round.hints[answer.char] ?? []),
+      secret: isSecret(answer),
+    }));
+    const points = discoveries.reduce((sum, discovery) => sum + discovery.points, 0);
+    gained = { answer: result.answer, points, secret: discoveries.some((discovery) => discovery.secret), discoveries };
     next = {
       ...next,
-      found: [...round.found, result.answer.char],
+      found: [...round.found, ...result.answers.map((answer) => answer.char)],
       score: round.score + points,
       combo: round.combo + 1,
       maxCombo: Math.max(round.maxCombo, round.combo + 1),
@@ -146,7 +175,7 @@ export function submit(stage: Stage, round: RoundState, selected: Iterable<numbe
     // ちがう組み合わせのときだけ「まちがい」に数える（点は減らさず、連続が切れるだけ）
     next = { ...next, misses: round.misses + 1, combo: 0 };
   }
-  const text = result.kind === "correct" || result.kind === "duplicate" ? result.answer.char : `${picked.length}画`;
+  const text = result.kind === "correct" || result.kind === "duplicate" ? result.answers.map((answer) => answer.char).join("・") : `${picked.length}画`;
   next.history = [{ text, kind: result.kind, at: now }, ...round.history].slice(0, HISTORY_LIMIT);
   const marked = markProgress(stage, next, now);
   return {
@@ -170,8 +199,9 @@ export function applyHint(stage: Stage, round: RoundState, answerChar: string, k
   if (!canUseHint(round, answerChar, kind)) return round;
   const hints = { ...round.hints, [answerChar]: [...(round.hints[answerChar] ?? []), kind] };
   if (kind !== "reveal") return { ...round, hints };
-  const found = [...round.found, answerChar];
-  return markProgress(stage, { ...round, hints, found, revealed: [...round.revealed, answerChar], combo: 0 }, now);
+  const group = equivalentAnswers(stage, [answerChar]).map((answer) => answer.char);
+  const found = [...new Set([...round.found, ...group])];
+  return markProgress(stage, { ...round, hints, found, revealed: [...new Set([...round.revealed, ...group])], combo: 0 }, now);
 }
 
 /** ヒントを使った回数。stage をわたすと、見つける字（シークレットでない字）に使った分だけを数える */

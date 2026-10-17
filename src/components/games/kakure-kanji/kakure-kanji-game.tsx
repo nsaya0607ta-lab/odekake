@@ -15,6 +15,7 @@ import {
   dropRound,
   expToNext,
   japanDate,
+  reconcileSave,
   skipStage,
   titleFor,
   type AchievementId,
@@ -67,11 +68,16 @@ export function KakureKanjiGame() {
       setStorageWarning("この端末では記録を保存できません（閉じると最初からになります）");
     }
     storeRef.current = store;
-    let data = store.load();
+    let data = reconcileSave(store.load(), STAGES, Date.now());
     const bonus = claimLoginBonus(data, japanDate(Date.now()));
     data = bonus.save;
     saveRef.current = data;
     setSave(data);
+    try {
+      store.save(data);
+    } catch {
+      setStorageWarning("記録を保存できませんでした。端末の空き容量を確かめてください");
+    }
     if (bonus.bonus) {
       const { coins, streak } = bonus.bonus;
       window.setTimeout(() => showToast(`ログインボーナス 墨コイン+${coins}枚${streak > 1 ? `（${streak}日連続）` : ""}`), 400);

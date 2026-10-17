@@ -372,7 +372,7 @@ test("9. どのステージもデータの形が正しい", () => {
     }
     assert.equal(new Set(stage.nearMisses.map((n) => n.char)).size, stage.nearMisses.length);
     assert.equal(stage.verification.status, "verified");
-    // 同じ画を異なる比率に見立てる字は、判定を一方へ固定せず選択肢にする。
+    // 同じ画を異なる比率に見立てる字は、一度でまとめて発見する。
     const bySelection = new Map();
     for (const a of stage.answers) for (const set of a.strokeSets) {
       const key = sorted(set).join(",");
@@ -381,7 +381,7 @@ test("9. どのステージもデータの形が正しい", () => {
     for (const [key, answers] of bySelection) if (answers.length > 1) {
       assert.ok(answers.some((a) => a.rule === "loose"), "比率を見立てる字だけが同じ組を共有する");
       const result = J.judgeStrokes(stage, key.split(",").map(Number), new Set());
-      assert.equal(result.kind, "ambiguous");
+      assert.equal(result.kind, "correct");
       assert.deepEqual(sorted(result.answers.map((a) => a.char)), sorted(answers.map((a) => a.char)));
     }
     for (const a of stage.answers) for (const set of a.strokeSets) assert.ok(set.length < stage.strokes.length, `${a.char} は全部の画ではない`);
@@ -610,10 +610,10 @@ test("11. 「称」は日本の7画目が横画。丁・下・小と、はなれ
 // ---------- 12. ステージ4〜10：全候補・同じ画の見立て・10問実績 ----------
 const SEVEN = {
   森: ["一二十木林人入大八", "卜杁杕"],
-  明: ["一二口日月", "曰"],
-  思: ["一二十口日田心土士志", "曰"],
-  想: ["一二三十木口日目心相旧", "卜曰"],
-  意: ["一二三口日立音心", "曰咅"],
+  明: ["一二口日月", ""],
+  思: ["一二十口日田心土士志", ""],
+  想: ["一二三十木口日目心相旧", "卜"],
+  意: ["一二三口日立音心", "咅"],
   語: ["一二三口言五工丁", "吾訂訌唔"],
   謝: ["一二三十口言寸身射討計", ""],
 };
@@ -621,7 +621,7 @@ const SEVEN = {
 for (const [char, [main, secret]] of Object.entries(SEVEN)) {
   const stage = STAGES.find((s) => s.kanji === char);
   assert.ok(stage, `${char} の出題`);
-  test(`12. 「${char}」の全候補と全${(1 << stage.strokes.length) - 1}組の判定（同じ組の別字も選べる）`, () => {
+  test(`12. 「${char}」の全候補と全${(1 << stage.strokes.length) - 1}組の判定（同じ組の別字も一緒に発見）`, () => {
     assert.deepEqual(sorted(E.mainAnswers(stage).map((a) => a.char)), sorted([...main]));
     assert.deepEqual(sorted(E.secretAnswers(stage).map((a) => a.char)), sorted([...secret]));
     const registered = new Map();
@@ -634,21 +634,21 @@ for (const [char, [main, secret]] of Object.entries(SEVEN)) {
       const expected = registered.get(sorted(ids).join(","));
       const result = J.judgeStrokes(stage, ids, new Set());
       if (!expected) {
-        assert.ok(!["correct", "ambiguous"].includes(result.kind), `${char} 未登録 [${ids}]`);
+        assert.ok(result.kind !== "correct", `${char} 未登録 [${ids}]`);
       } else if (expected.length === 1) {
         assert.equal(result.kind, "correct");
         assert.equal(result.answer.char, expected[0]);
       } else {
-        assert.equal(result.kind, "ambiguous");
+        assert.equal(result.kind, "correct");
         assert.deepEqual(sorted(result.answers.map((a) => a.char)), sorted(expected));
-        for (const answer of expected) assert.equal(J.judgeStrokes(stage, ids, new Set(), answer).answer.char, answer);
+        assert.deepEqual(sorted(E.submit(stage, E.newRound(stage, 0), ids, 1).round.found), sorted(expected));
       }
     }
   });
   test(`12. 「${char}」は全通常字でクリアし、保存・再開して全シークレットまで完成する`, () => {
     let round = E.newRound(stage, 0);
     for (const a of E.mainAnswers(stage)) {
-      round = E.submit(stage, round, a.strokeSets[0], 1, a.char).round;
+      round = E.submit(stage, round, a.strokeSets[0], 1).round;
     }
     assert.equal(round.clearedAt, 1);
     const store = P.createKeyValueStore(memoryStorage());
@@ -657,7 +657,7 @@ for (const [char, [main, secret]] of Object.entries(SEVEN)) {
     store.save(cleared.save);
     let save = store.load();
     for (const a of E.secretAnswers(stage)) {
-      round = E.submit(stage, save.rounds[stage.id], a.strokeSets[0], 3, a.char).round;
+      round = E.submit(stage, save.rounds[stage.id], a.strokeSets[0], 3).round;
       save = P.saveRound(save, round);
     }
     assert.ok(round.completedAt !== null);
@@ -667,28 +667,102 @@ for (const [char, [main, secret]] of Object.entries(SEVEN)) {
   });
 }
 
-test("12. 同じ組で日と曰／土と士に答えても、選択前は点数も履歴も保存も変わらない", () => {
-  const stage = STAGES.find((s) => s.kanji === "思");
-  let round = E.newRound(stage, 0);
-  for (const pair of [["日", "曰"], ["土", "士"]]) {
-    const ids = stage.answers.find((a) => a.char === pair[0]).strokeSets[0];
-    const offered = E.submit(stage, round, ids, 1);
-    assert.equal(offered.result.kind, "ambiguous");
-    assert.equal(offered.round, round);
-    assert.equal(offered.gained, null);
-    assert.equal(E.submit(stage, round, ids, 1, "存在しない字").round, round);
-    for (const char of pair) {
-      const result = E.submit(stage, round, ids, 2, char);
-      assert.equal(result.result.kind, "correct");
-      round = result.round;
+test("12. 曰は全ステージの答えから除外し、同じ4画は日だけになる", () => {
+  assert.ok(STAGES.every((stage) => !stage.answers.some((a) => a.char === "曰")));
+  for (const char of ["明", "思", "想", "意"]) {
+    const stage = STAGES.find((s) => s.kanji === char);
+    for (const ids of stage.answers.find((a) => a.char === "日").strokeSets) {
+      const result = J.judgeStrokes(stage, ids, new Set());
+      assert.equal(result.kind, "correct");
+      assert.deepEqual(result.answers.map((a) => a.char), ["日"]);
     }
-    const duplicate = E.submit(stage, round, ids, 3, pair[0]);
-    assert.equal(duplicate.result.kind, "duplicate");
-    assert.equal(duplicate.round.score, round.score);
   }
+});
+
+test("12. 土／士と人／入は一度で両方発見し、同じ組への再回答で加点しない", () => {
+  for (const [char, pair] of [["思", ["土", "士"]], ["森", ["人", "入"]]]) {
+    const stage = STAGES.find((s) => s.kanji === char);
+    const answer = stage.answers.find((a) => a.char === pair[0]);
+    for (const ids of answer.strokeSets) {
+      const out = E.submit(stage, E.newRound(stage, 0), ids, 1);
+      assert.equal(out.result.kind, "correct");
+      assert.deepEqual(sorted(out.round.found), sorted(pair));
+      assert.equal(out.round.combo, 1, "一度の回答なのでコンボは一回だけ進む");
+      assert.equal(out.round.history.length, 1);
+      assert.equal(out.round.history[0].text, pair.join("・"));
+      const points = pair.reduce((sum, ch) => sum + E.pointsFor(stage.answers.find((a) => a.char === ch), 0, []), 0);
+      assert.equal(out.gained.points, points, "見つけた各字の点数を加算する");
+      for (const another of answer.strokeSets) {
+        const duplicate = E.submit(stage, out.round, another, 2);
+        assert.equal(duplicate.result.kind, "duplicate");
+        assert.equal(duplicate.gained, null);
+        for (const field of ["score", "combo", "maxCombo", "misses"]) assert.equal(duplicate.round[field], out.round[field]);
+      }
+      const partial = { ...E.newRound(stage, 0), found: [pair[0]] };
+      const remaining = E.submit(stage, partial, ids, 3);
+      assert.deepEqual(remaining.gained.discoveries.map((d) => d.answer.char), [pair[1]]);
+      assert.deepEqual(sorted(remaining.round.found), sorted(pair));
+    }
+  }
+});
+
+test("12. 組の片方をヒントで開くと両方開き、未発見の字のヒント代は重複しない", () => {
+  for (const [char, pair] of [["思", ["土", "士"]], ["森", ["人", "入"]]]) {
+    const stage = STAGES.find((s) => s.kanji === char);
+    for (const target of pair) {
+      const round = E.applyHint(stage, E.newRound(stage, 0), target, "reveal", 1);
+      assert.deepEqual(sorted(round.found), sorted(pair));
+      assert.deepEqual(sorted(round.revealed), sorted(pair));
+      assert.equal(round.score, 0);
+      for (const ch of pair) assert.equal(E.canUseHint(round, ch, "reveal"), false);
+      assert.equal(E.starsFor(stage, round), 1);
+    }
+  }
+});
+
+test("12. 旧セーブの曰は日に統合し、土／士・人／入も引き継ぐ（点数・所持品は維持）", () => {
+  const shi = STAGES.find((s) => s.kanji === "思");
+  const mori = STAGES.find((s) => s.kanji === "森");
+  let save = { ...P.defaultSave(), coins: 234, totalPoints: 567, stats: { correct: 8, wrong: 2 } };
+  save = P.saveRound(save, { ...E.newRound(shi, 0), found: ["曰", "士"], revealed: ["曰", "士"], hints: { "日": ["strokes"], "曰": ["reading", "strokes"], "士": ["reveal"] }, score: 300, history: [{ text: "曰", kind: "correct", at: 1 }] });
+  save = P.saveRound(save, { ...E.newRound(mori, 0), found: ["入"], score: 100 });
+  save.stages[shi.id] = { clears: 1, bestStars: 3, bestScore: 999, firstClearedAt: 1, secretsFound: ["曰"] };
+  save.hintLog = [{ stageId: shi.id, answer: "曰", kind: "reading", cost: 10, at: 1 }];
+  const migrated = P.reconcileSave(save, STAGES, 2);
+  assert.deepEqual(sorted(migrated.rounds[shi.id].found), sorted(["日", "土", "士"]));
+  assert.deepEqual(sorted(migrated.rounds[shi.id].revealed), sorted(["日", "土", "士"]));
+  assert.deepEqual(sorted(migrated.rounds[shi.id].hints["日"]), sorted(["reading", "strokes"]));
+  assert.equal(migrated.rounds[shi.id].hints["曰"], undefined);
+  assert.equal(migrated.rounds[shi.id].history[0].text, "日");
+  assert.equal(migrated.hintLog[0].answer, "日");
+  assert.deepEqual(migrated.stages[shi.id].secretsFound, []);
+  assert.deepEqual(sorted(migrated.rounds[mori.id].found), sorted(["人", "入"]));
+  for (const field of ["coins", "exp", "totalPoints", "stats", "achievements"]) assert.deepEqual(migrated[field], save[field]);
+  assert.equal(migrated.rounds[shi.id].score, 300);
+  assert.equal(migrated.stages[shi.id].bestScore, 999);
   const store = P.createKeyValueStore(memoryStorage());
-  store.save(P.saveRound(P.defaultSave(), round));
-  assert.deepEqual(sorted(store.load().rounds[stage.id].found), sorted(["日", "曰", "土", "士"]));
+  store.save(migrated);
+  const reloaded = store.load();
+  assert.deepEqual(reloaded, migrated);
+  assert.deepEqual(P.reconcileSave(reloaded, STAGES, 3), migrated, "何度読み込んでも変化しない");
+});
+
+test("12. 正解の統合でクリア・完成した旧セーブも、報酬は一度だけ受け取る", () => {
+  const stage = STAGES.find((s) => s.kanji === "思");
+  const old = { ...E.newRound(stage, 0), found: E.mainAnswers(stage).map((a) => a.char).filter((ch) => ch !== "士"), score: 900 };
+  const save = P.reconcileSave(P.saveRound(P.defaultSave(), old), STAGES, 2);
+  const round = save.rounds[stage.id];
+  assert.equal(round.clearedAt, 2);
+  assert.equal(round.completedAt, 2);
+  assert.equal(round.rewardedAt, 2);
+  assert.equal(save.stages[stage.id].clears, 1);
+  assert.deepEqual(P.reconcileSave(save, STAGES, 3), save);
+  const previouslyRewarded = { ...round, completedAt: null, found: [...old.found, "曰"] };
+  const resumed = P.reconcileSave(P.saveRound(save, previouslyRewarded), STAGES, 4);
+  assert.equal(resumed.rounds[stage.id].completedAt, 4, "削除したシークレットで完成を妨げない");
+  assert.equal(resumed.coins, save.coins);
+  assert.equal(resumed.totalPoints, save.totalPoints);
+  assert.equal(resumed.stages[stage.id].clears, 1);
 });
 
 test("12. 既存3問のIDを維持し、10ステージクリアの実績を実際に達成できる", () => {
@@ -697,7 +771,7 @@ test("12. 既存3問のIDを維持し、10ステージクリアの実績を実�
   let save = P.defaultSave();
   for (const stage of STAGES) {
     let round = E.newRound(stage, 0);
-    for (const a of E.mainAnswers(stage)) round = E.submit(stage, round, a.strokeSets[0], 1, a.char).round;
+    for (const a of E.mainAnswers(stage)) round = E.submit(stage, round, a.strokeSets[0], 1).round;
     save = P.completeStage(P.saveRound(save, round), stage, round, 2).save;
   }
   assert.equal(P.clearedStageCount(save), 10);
