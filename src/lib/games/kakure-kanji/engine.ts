@@ -119,7 +119,7 @@ export function reconcileRound(stage: Stage, round: RoundState, now: number): Ro
     const target = canonical(char);
     if (chars.has(target)) hints[target] = [...new Set([...(hints[target] ?? []), ...used])];
   }
-  return markProgress(stage, {
+  const next: RoundState = {
     ...round,
     found: normalize(round.found),
     revealed: normalize(round.revealed),
@@ -129,6 +129,13 @@ export function reconcileRound(stage: Stage, round: RoundState, now: number): Ro
       const text = normalize(record.text.split("・")).join("・");
       return text ? [{ ...record, text }] : [];
     }),
+  };
+  // 正解の追加後は、以前に全発見済みでも新しい字を続けて探せるようにする。
+  // クリア報酬の rewardedAt と獲得済みの点数は維持する。
+  return markProgress(stage, {
+    ...next,
+    clearedAt: isCleared(stage, next) ? next.clearedAt : null,
+    completedAt: isCompleted(stage, next) ? next.completedAt : null,
   }, now);
 }
 
