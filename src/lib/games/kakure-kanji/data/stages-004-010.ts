@@ -202,37 +202,6 @@ const STAGE_DATA: Omit<Stage, "strokes">[] = [
         }
       },
       {
-        "char": "大",
-        "strokeSets": [
-          [
-            1,
-            3,
-            4
-          ],
-          [
-            9,
-            11,
-            12
-          ]
-        ],
-        "rule": "loose",
-        "evidence": "上か右下の木から、縦画だけを外すよ。左下の木の短い点は、右払いには変えない。",
-        "tier": 2,
-        "meaning": "おおきい",
-        "grade": 1,
-        "rare": false,
-        "readings": [
-          "ダイ",
-          "タイ",
-          "おおいに"
-        ],
-        "partHint": "上か右下の木から、縦画だけを外すよ。左下の木の短い点は、右払いには変えない。",
-        "verification": {
-          "status": "verified",
-          "note": "日本の筆順・筆画図と対応する画の組を照合。線を動かさず、全画を使ったときの本数・種類・位置関係を確認。"
-        }
-      },
-      {
         "char": "八",
         "strokeSets": [
           [
@@ -281,39 +250,21 @@ const STAGE_DATA: Omit<Stage, "strokes">[] = [
           "status": "verified",
           "note": "日本の筆順・筆画図と対応する画の組を照合。線を動かさず、全画を使ったときの本数・種類・位置関係を確認。"
         }
-      },
-      {
-        "char": "杕",
-        "strokeSets": [
-          [
-            5,
-            6,
-            7,
-            8,
-            9,
-            11,
-            12
-          ]
-        ],
-        "rule": "loose",
-        "evidence": "左下の木を全部えらび、右下の木から大の形をえらぶよ。",
-        "tier": 3,
-        "meaning": "一本だけで立つ木",
-        "grade": null,
-        "rare": true,
-        "readings": [
-          "テイ",
-          "ダイ",
-          "タ"
-        ],
-        "partHint": "左下の木を全部えらび、右下の木から大の形をえらぶよ。",
-        "verification": {
-          "status": "verified",
-          "note": "日本の筆順・筆画図と対応する画の組を照合。線を動かさず、全画を使ったときの本数・種類・位置関係を確認。"
-        }
       }
     ],
     "nearMisses": [
+      {
+        "char": "大",
+        "reading": "ダイ（おおきい）",
+        "category": "shape",
+        "reason": "木の縦画を外すと、左払いが横画より上に突き出しません。大に必要な上の部分を足したり伸ばしたりはできないので、正解にはしません。"
+      },
+      {
+        "char": "杕",
+        "reading": "テイ",
+        "category": "shape",
+        "reason": "右下の木から縦画を外しても、大に必要な上への突き出しが残りません。大を作れないので、木と大を組み合わせる杕も正解にはしません。"
+      },
       {
         "char": "三",
         "reading": "サン",
@@ -354,7 +305,7 @@ const STAGE_DATA: Omit<Stage, "strokes">[] = [
     "verification": {
       "status": "verified",
       "checkedOn": "2026-10-17",
-      "note": "KanjiVGの日本の筆画図・部品構造、KANJIDIC2の字・読み・学年を照合。候補の全一覧と除外理由は docs/kakure-kanji-answers-004-010.md。同じ画の組には実際の字形に合う正解を一字だけ登録する。曰は日へ統合。"
+      "note": "KanjiVGの日本の筆画図・部品構造、KANJIDIC2の字・読み・学年を照合。候補の全一覧と除外理由は docs/kakure-kanji-answers-004-010.md。同じ画の組には実際の字形に合う正解を一字だけ登録する。曰は日へ統合。 2026-10-17再確認：横画より上への突き出しが欠ける大と、その形を前提にする派生字を除外。"
     },
     "answerAliases": {
       "入": "人"

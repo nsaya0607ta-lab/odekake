@@ -111,32 +111,6 @@ const STAGE_DATA: Omit<Stage, "strokes">[] = [
         }
       },
       {
-        "char": "大",
-        "readings": [
-          "ダイ",
-          "タイ",
-          "おおきい"
-        ],
-        "meaning": "おおきい",
-        "rule": "loose",
-        "strokeSets": [
-          [
-            3,
-            5,
-            6
-          ]
-        ],
-        "evidence": "木の縦画を外して、横画と左右の払いをえらぶよ。",
-        "tier": 2,
-        "grade": 1,
-        "rare": false,
-        "partHint": "木の縦画を外して、横画と左右の払いをえらぶよ。",
-        "verification": {
-          "status": "verified",
-          "note": "KanjiVGの原図と抽出した筆画を照合。線を切らずに使い、向き・接続・位置を確認。同じ組の正解は一字だけ。"
-        }
-      },
-      {
         "char": "八",
         "readings": [
           "ハチ",
@@ -189,6 +163,12 @@ const STAGE_DATA: Omit<Stage, "strokes">[] = [
     ],
     "nearMisses": [
       {
+        "char": "大",
+        "reading": "ダイ（おおきい）",
+        "category": "shape",
+        "reason": "木の縦画を外すと、左払いが横画より上に突き出しません。大に必要な上の部分を足したり伸ばしたりはできないので、正解にはしません。"
+      },
+      {
         "char": "入",
         "reading": "ニュウ",
         "category": "shape",
@@ -216,7 +196,7 @@ const STAGE_DATA: Omit<Stage, "strokes">[] = [
     "verification": {
       "status": "verified",
       "checkedOn": "2026-10-17",
-      "note": "KanjiVGの日本の筆画図、KANJIDIC2の読み・学年を照合。全候補・全筆画の組・除外理由は docs/kakure-kanji-answers-011-016.md。同じ線の組に正解を重複させず、曰は使わない。"
+      "note": "KanjiVGの日本の筆画図、KANJIDIC2の読み・学年を照合。全候補・全筆画の組・除外理由は docs/kakure-kanji-answers-011-016.md。同じ線の組に正解を重複させず、曰は使わない。 2026-10-17再確認：横画より上への突き出しが欠ける大と、その形を前提にする派生字を除外。"
     }
   },
   {
@@ -385,32 +365,6 @@ const STAGE_DATA: Omit<Stage, "strokes">[] = [
         }
       },
       {
-        "char": "大",
-        "readings": [
-          "ダイ",
-          "タイ",
-          "おおきい"
-        ],
-        "meaning": "おおきい",
-        "rule": "loose",
-        "strokeSets": [
-          [
-            3,
-            5,
-            6
-          ]
-        ],
-        "evidence": "本の中央の縦画と、一番下の横画を外すよ。",
-        "tier": 2,
-        "grade": 1,
-        "rare": false,
-        "partHint": "本の中央の縦画と、一番下の横画を外すよ。",
-        "verification": {
-          "status": "verified",
-          "note": "KanjiVGの原図と抽出した筆画を照合。線を切らずに使い、向き・接続・位置を確認。同じ組の正解は一字だけ。"
-        }
-      },
-      {
         "char": "八",
         "readings": [
           "ハチ",
@@ -523,6 +477,12 @@ const STAGE_DATA: Omit<Stage, "strokes">[] = [
     ],
     "nearMisses": [
       {
+        "char": "大",
+        "reading": "ダイ（おおきい）",
+        "category": "shape",
+        "reason": "木の縦画を外すと、左払いが横画より上に突き出しません。大に必要な上の部分を足したり伸ばしたりはできないので、正解にはしません。"
+      },
+      {
         "char": "土",
         "reading": "ド",
         "category": "shape",
@@ -562,7 +522,7 @@ const STAGE_DATA: Omit<Stage, "strokes">[] = [
     "verification": {
       "status": "verified",
       "checkedOn": "2026-10-17",
-      "note": "KanjiVGの日本の筆画図、KANJIDIC2の読み・学年を照合。全候補・全筆画の組・除外理由は docs/kakure-kanji-answers-011-016.md。同じ線の組に正解を重複させず、曰は使わない。"
+      "note": "KanjiVGの日本の筆画図、KANJIDIC2の読み・学年を照合。全候補・全筆画の組・除外理由は docs/kakure-kanji-answers-011-016.md。同じ線の組に正解を重複させず、曰は使わない。 2026-10-17再確認：横画より上への突き出しが欠ける大と、その形を前提にする派生字を除外。"
     }
   },
   {
