@@ -4,7 +4,7 @@ import type { Stage } from "../types";
  * ステージ3「称」。日本の10画の筆順で独自に描いた筆画。
  * 確認資料: https://kakijun.jp/page/10173200.html
  * 7画目は折れない横画。中国簡体字の「尔」の横鉤とは区別する。
- * のぎへんの5画目は、短い右払いの字形を使用（点と払いを混同しない）。
+ * のぎへんの5画目は短い点。秋・想と同じ基準で、八の右払いには使わない。
  */
 export const STAGE_003_SHOU: Stage = {
   id: "s003-shou",
@@ -18,7 +18,7 @@ export const STAGE_003_SHOU: Stage = {
     { id: 2, kind: "横", d: "M10 40 L43 37", width: 4.8 },
     { id: 3, kind: "縦", d: "M29 23 L29 90", width: 5.2 },
     { id: 4, kind: "左払い", d: "M29 39 C27 52 20 65 9 75", width: 5 },
-    { id: 5, kind: "右払い", d: "M34 49 C38 52 41 56 44 60", width: 4.8 },
+    { id: 5, kind: "点", d: "M34 49 C38 52 41 56 44 60", width: 4.8 },
     { id: 6, kind: "左払い", d: "M63 11 C61 25 55 37 45 47", width: 5.2 },
     { id: 7, kind: "横", d: "M58 34 L88 31", width: 4.8 },
     { id: 8, kind: "縦鉤", d: "M70 33 L70 86 L65 81", width: 5.2 },
@@ -50,16 +50,9 @@ export const STAGE_003_SHOU: Stage = {
     {
       char: "木", readings: ["モク", "ボク", "き"], meaning: "き", rule: "component",
       strokeSets: [[2, 3, 4, 5]], tier: 1, grade: 1,
-      evidence: "のぎへんから一番上の払いを外した2〜5画目が木の形。右の払いが短い、偏の中の木の形をそのまま取り出す。",
+      evidence: "のぎへんから一番上の払いを外した2〜5画目が木の形。右下が点になった、偏の中の木の形をそのまま取り出す。",
       partHint: "左の部品から、一番上の払いを外すよ",
-      verification: { status: "verified", note: "横・縦・左払い・短い右払いの4画。のぎへんの中の木の部品を照合。" },
-    },
-    {
-      char: "八", readings: ["ハチ", "や"], meaning: "やっつ", rule: "loose",
-      strokeSets: [[4, 5]], tier: 3, grade: 1,
-      evidence: "のぎへんの左払い4画目と短い右払い5画目をえらぶ。2本は左右にはなれていて、長さの比率を問わない見立てでは八になる。",
-      partHint: "左の部品の中から、左右へはらう2本だけをえらぶよ",
-      verification: { status: "verified", note: "左払いが左、右払いが右で、2本は接しない。点ではなく短い右払いで描いた字形を確認。" },
+      verification: { status: "verified", note: "横・縦・左払い・点の4画。木が偏で点になる部品字形を照合。" },
     },
     {
       char: "小", readings: ["ショウ", "ちい"], meaning: "ちいさい", rule: "component",
@@ -89,14 +82,22 @@ export const STAGE_003_SHOU: Stage = {
       partHint: "左の部品を全部えらぶよ",
       verification: { status: "verified", note: "禾の5画と部品構造を照合。小学校の学年別漢字配当表にない字なのでシークレット。" },
     },
+    {
+      char: "卜", readings: ["ボク", "うらなう"], meaning: "うらなう", rule: "strokes",
+      strokeSets: [[3, 5]], tier: 3, grade: null, rare: true,
+      evidence: "のぎへんから、縦画3画目と、その右にある短い点5画目をえらぶ。秋や想から取り出す卜と同じ、縦と点の2画になる。",
+      partHint: "左の部品の、長い縦線と右の短い点だけをえらぶよ",
+      verification: { status: "verified", note: "縦・点の2画。点が縦画の右側にある卜の配置を確認。" },
+    },
   ],
   nearMisses: [
+    { char: "八", reading: "ハチ（やっつ）", category: "missing", reason: "のぎへんの右下は短い点です。八に必要な右払いがないため、点を払いに変えて正解にはしません。" },
     { char: "二", reading: "ニ（ふたつ）", category: "position", reason: "独立した横画は2本ありますが、左下と右上にはなれていて横の位置が重なりません。線を動かして二にすることはできません。" },
-    { char: "人", reading: "ジン（ひと）", category: "position", reason: "のぎへんの左右の払い2本ははなれていて、人のように上でくっつきません。この2本は長さを見立てた八として扱います。" },
+    { char: "人", reading: "ジン（ひと）", category: "missing", reason: "のぎへんの右下は点で、人に必要な右払いではありません。左払いと点の組を人にはしません。" },
     { char: "不", reading: "フ（否定する字）", category: "position", reason: "右下の小の左払いは、上の横画からはなれた位置にあります。不にするには左払いの始まる位置を動かす必要があるため、答えにしません。" },
     { char: "少", reading: "ショウ（すくない）", category: "position", reason: "少では小の下に長い左払いが付きます。称の追加の左払いは上や左にあり、小の下にはないので作れません。" },
     { char: "丿", reading: "の（部首）", category: "radical", reason: "払い1本だけの丿は部首の形なので答えにしません。左の5画を全部えらぶ禾は、単独の漢字なので答えになります。" },
   ],
   reward: { coins: 55, exp: 80, replayCoins: 10, replayExp: 20 },
-  verification: { status: "verified", checkedOn: "2026-10-17", note: "日本の10画の筆順・教科書体と独自描画を照合。教育漢字8字とシークレット禾を確認。下だけは小さな縦画のはねを見立て、点と払い・位置の変更は許容しない。" },
+  verification: { status: "verified", checkedOn: "2026-10-17", note: "日本の10画の筆順・教科書体と独自描画を照合。5画目を秋・想と同じ点として統一し、八を除外して卜を追加。教育漢字7字とシークレット禾・卜を確認。下だけは小さな縦画のはねを見立て、点と払い・位置の変更は許容しない。" },
 };

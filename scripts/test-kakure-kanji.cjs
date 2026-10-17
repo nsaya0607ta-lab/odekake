@@ -533,13 +533,13 @@ test("10. どの結果にも画面に出す文があり、undefined が出ない
 // ---------- 11. 追加ステージ「漢」「称」 ----------
 const additions = [
   { char: "漢", main: ["一", "二", "三", "十", "口", "人", "大", "夫"], secret: ["汁"] },
-  { char: "称", main: ["一", "十", "千", "木", "八", "小", "丁", "下"], secret: ["禾"] },
+  { char: "称", main: ["一", "十", "千", "木", "小", "丁", "下"], secret: ["禾", "卜"] },
 ];
 
 for (const { char, main, secret } of additions) {
   const stage = STAGES.find((s) => s.kanji === char);
   assert.ok(stage, `ステージ「${char}」が公開一覧にある`);
-  test(`11. 「${char}」の通常8字とシークレット1字、全筆画の組で判定が一致する`, () => {
+  test(`11. 「${char}」の通常${main.length}字とシークレット${secret.length}字、全筆画の組で判定が一致する`, () => {
     assert.deepEqual(sorted(E.mainAnswers(stage).map((a) => a.char)), sorted(main));
     assert.deepEqual(sorted(E.secretAnswers(stage).map((a) => a.char)), sorted(secret));
     const registered = new Map(stage.answers.flatMap((a) => a.strokeSets.map((ids) => [sorted(ids).join(","), a.char])));
@@ -590,7 +590,7 @@ test("11. 「漢」の横画は二が6通り・三が4通りで、天とは区�
   assert.ok(!stage.answers.some((a) => ["天", "中", "八", "氵", "艹"].includes(a.char)));
 });
 
-test("11. 「称」は日本の7画目が横画。丁・下・小と、はなれた八を区別する", () => {
+test("11. 「称」は5画目を点とし、卜・丁・下・小を認めて八にはしない", () => {
   const stage = STAGES.find((s) => s.kanji === "称");
   const answer = (ids) => J.judgeStrokes(stage, ids, new Set()).answer.char;
   assert.equal(stage.strokes[6].kind, "横");
@@ -598,13 +598,15 @@ test("11. 「称」は日本の7画目が横画。丁・下・小と、はなれ
   assert.equal(answer([7, 8]), "丁");
   assert.equal(answer([7, 8, 10]), "下");
   assert.equal(answer([8, 9, 10]), "小");
-  assert.equal(answer([4, 5]), "八");
-  // 左払いのすべての制御点が x <= 29、右払いは x >= 34。線の太さを含めても接しない。
-  const xs = (id) => stage.strokes.find((s) => s.id === id).d.match(/-?\d+(\.\d+)?/g).map(Number).filter((_, i) => i % 2 === 0);
-  const left = stage.strokes[3];
-  const right = stage.strokes[4];
-  assert.ok(Math.max(...xs(4)) + left.width / 2 < Math.min(...xs(5)) - right.width / 2);
-  assert.ok(!stage.answers.some((a) => ["二", "人", "少", "不"].includes(a.char)));
+  assert.equal(stage.strokes[4].kind, "点");
+  assert.equal(answer([3, 5]), "卜");
+  assert.equal(J.judgeStrokes(stage, [4, 5], new Set()).kind, "wrong");
+  assert.ok(!stage.answers.some((a) => ["二", "人", "八", "少", "不"].includes(a.char)));
+  for (const [kanji, ids] of [["称", [3, 5]], ["秋", [3, 5]], ["想", [2, 4]], ["森", [6, 8]], ["村", [2, 4]]]) {
+    const s = STAGES.find((s) => s.kanji === kanji);
+    assert.deepEqual(ids.map((id) => s.strokes.find((p) => p.id === id).kind), ["縦", "点"], `${kanji}の卜`);
+    assert.equal(J.judgeStrokes(s, ids, new Set()).answer.char, "卜");
+  }
 });
 
 // ---------- 12. ステージ4〜10：全候補・同じ画の見立て・10問実績 ----------
