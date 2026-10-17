@@ -3,6 +3,8 @@ import extraStructures from "./structures-004-010.json";
 import componentVariants from "./component-variants-004-010.json";
 import moreStructures from "./structures-011-016.json";
 import moreComponentVariants from "./component-variants-011-016.json";
+import furtherStructures from "./structures-017-024.json";
+import furtherComponentVariants from "./component-variants-017-024.json";
 
 /**
  * 漢字の構造データ（補助）。日本の筆順での画の種類の並び。
@@ -53,10 +55,11 @@ export const STROKE_STRUCTURES: Record<string, StrokeKind[]> = {
   少: ["縦", "点", "左払い", "左払い"],
   ...extraStructures as Record<string, StrokeKind[]>,
   ...moreStructures as Record<string, StrokeKind[]>,
+  ...furtherStructures as Record<string, StrokeKind[]>,
 };
 
 /** 木が偏になると右払いが点になるなど、辞書で確認できる部品の字形差。点と払いを一律に同一視しない。 */
-export const STROKE_STRUCTURE_VARIANTS = { ...componentVariants, ...moreComponentVariants } as Record<string, StrokeKind[][]>;
+export const STROKE_STRUCTURE_VARIANTS = { ...componentVariants, ...moreComponentVariants, ...furtherComponentVariants } as Record<string, StrokeKind[][]>;
 
 /** 標準の画数（構造データの長さと一致するかをテストで見る） */
 export const STROKE_COUNTS: Record<string, number> = {
@@ -66,6 +69,7 @@ export const STROKE_COUNTS: Record<string, number> = {
   天: 4, 中: 4, 不: 4, 少: 4,
   ...Object.fromEntries(Object.entries(extraStructures).map(([char, structure]) => [char, structure.length])),
   ...Object.fromEntries(Object.entries(moreStructures).map(([char, structure]) => [char, structure.length])),
+  ...Object.fromEntries(Object.entries(furtherStructures).map(([char, structure]) => [char, structure.length])),
 };
 
 /**

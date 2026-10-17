@@ -1,0 +1,343 @@
+{
+  "一": {
+    "readings": [
+      "イチ",
+      "ひとつ"
+    ],
+    "meaning": "ひとつ",
+    "grade": 1,
+    "rare": false
+  },
+  "丁": {
+    "readings": [
+      "チョウ",
+      "テイ"
+    ],
+    "meaning": "区画や順序を表す字",
+    "grade": 3,
+    "rare": false
+  },
+  "三": {
+    "readings": [
+      "サン",
+      "みっつ"
+    ],
+    "meaning": "みっつ",
+    "grade": 1,
+    "rare": false
+  },
+  "二": {
+    "readings": [
+      "ニ",
+      "ふたつ"
+    ],
+    "meaning": "ふたつ",
+    "grade": 1,
+    "rare": false
+  },
+  "人": {
+    "readings": [
+      "ジン",
+      "ニン",
+      "ひと"
+    ],
+    "meaning": "ひと",
+    "grade": 1,
+    "rare": false
+  },
+  "力": {
+    "readings": [
+      "リョク",
+      "リキ",
+      "ちから"
+    ],
+    "meaning": "ちから",
+    "grade": 1,
+    "rare": false
+  },
+  "匕": {
+    "readings": [
+      "ヒ",
+      "さじ"
+    ],
+    "meaning": "さじ",
+    "grade": null,
+    "rare": true
+  },
+  "化": {
+    "readings": [
+      "カ",
+      "ケ",
+      "ばける"
+    ],
+    "meaning": "すがたを変える",
+    "grade": 3,
+    "rare": false
+  },
+  "十": {
+    "readings": [
+      "ジュウ",
+      "とお"
+    ],
+    "meaning": "とお",
+    "grade": 1,
+    "rare": false
+  },
+  "卜": {
+    "readings": [
+      "ボク",
+      "うらなう"
+    ],
+    "meaning": "うらなう",
+    "grade": null,
+    "rare": true
+  },
+  "厂": {
+    "readings": [
+      "カン",
+      "がんだれ"
+    ],
+    "meaning": "がけの形を表す字",
+    "grade": null,
+    "rare": true
+  },
+  "口": {
+    "readings": [
+      "コウ",
+      "くち"
+    ],
+    "meaning": "くち",
+    "grade": 1,
+    "rare": false
+  },
+  "古": {
+    "readings": [
+      "コ",
+      "ふるい"
+    ],
+    "meaning": "ふるい",
+    "grade": 2,
+    "rare": false
+  },
+  "另": {
+    "readings": [
+      "レイ",
+      "リョウ",
+      "べつの"
+    ],
+    "meaning": "べつの・分かれる",
+    "grade": null,
+    "rare": true
+  },
+  "叮": {
+    "readings": [
+      "テイ"
+    ],
+    "meaning": "念を入れて頼む・音のひびき",
+    "grade": null,
+    "rare": true
+  },
+  "囚": {
+    "readings": [
+      "シュウ",
+      "とらわれる"
+    ],
+    "meaning": "とらわれる",
+    "grade": null,
+    "rare": false
+  },
+  "因": {
+    "readings": [
+      "イン",
+      "よる"
+    ],
+    "meaning": "原因・もとになること",
+    "grade": 5,
+    "rare": false
+  },
+  "困": {
+    "readings": [
+      "コン",
+      "こまる"
+    ],
+    "meaning": "こまる",
+    "grade": 6,
+    "rare": false
+  },
+  "士": {
+    "readings": [
+      "シ",
+      "さむらい"
+    ],
+    "meaning": "さむらい",
+    "grade": 5,
+    "rare": false
+  },
+  "大": {
+    "readings": [
+      "ダイ",
+      "タイ",
+      "おおきい"
+    ],
+    "meaning": "おおきい",
+    "grade": 1,
+    "rare": false
+  },
+  "寸": {
+    "readings": [
+      "スン"
+    ],
+    "meaning": "長さの単位・わずか",
+    "grade": 6,
+    "rare": false
+  },
+  "山": {
+    "readings": [
+      "サン",
+      "やま"
+    ],
+    "meaning": "やま",
+    "grade": 1,
+    "rare": false
+  },
+  "岩": {
+    "readings": [
+      "ガン",
+      "いわ"
+    ],
+    "meaning": "いわ",
+    "grade": 2,
+    "rare": false
+  },
+  "日": {
+    "readings": [
+      "ニチ",
+      "ジツ",
+      "ひ"
+    ],
+    "meaning": "ひ・たいよう",
+    "grade": 1,
+    "rare": false
+  },
+  "月": {
+    "readings": [
+      "ゲツ",
+      "ガツ",
+      "つき"
+    ],
+    "meaning": "つき",
+    "grade": 1,
+    "rare": false
+  },
+  "木": {
+    "readings": [
+      "モク",
+      "ボク",
+      "き"
+    ],
+    "meaning": "き",
+    "grade": 1,
+    "rare": false
+  },
+  "村": {
+    "readings": [
+      "ソン",
+      "むら"
+    ],
+    "meaning": "むら",
+    "grade": 1,
+    "rare": false
+  },
+  "汁": {
+    "readings": [
+      "ジュウ",
+      "しる"
+    ],
+    "meaning": "しる",
+    "grade": null,
+    "rare": false
+  },
+  "沽": {
+    "readings": [
+      "コ",
+      "うる"
+    ],
+    "meaning": "うる・買う",
+    "grade": null,
+    "rare": true
+  },
+  "湖": {
+    "readings": [
+      "コ",
+      "みずうみ"
+    ],
+    "meaning": "みずうみ",
+    "grade": 3,
+    "rare": false
+  },
+  "田": {
+    "readings": [
+      "デン",
+      "た"
+    ],
+    "meaning": "た・たんぼ",
+    "grade": 1,
+    "rare": false
+  },
+  "男": {
+    "readings": [
+      "ダン",
+      "ナン",
+      "おとこ"
+    ],
+    "meaning": "おとこ",
+    "grade": 1,
+    "rare": false
+  },
+  "町": {
+    "readings": [
+      "チョウ",
+      "まち"
+    ],
+    "meaning": "まち",
+    "grade": 1,
+    "rare": false
+  },
+  "石": {
+    "readings": [
+      "セキ",
+      "シャク",
+      "いし"
+    ],
+    "meaning": "いし",
+    "grade": 1,
+    "rare": false
+  },
+  "胡": {
+    "readings": [
+      "コ",
+      "ゴ"
+    ],
+    "meaning": "外国や遠方を表す字・えびす",
+    "grade": null,
+    "rare": true
+  },
+  "花": {
+    "readings": [
+      "カ",
+      "はな"
+    ],
+    "meaning": "はな",
+    "grade": 1,
+    "rare": false
+  },
+  "苗": {
+    "readings": [
+      "ビョウ",
+      "なえ"
+    ],
+    "meaning": "なえ",
+    "grade": null,
+    "rare": false
+  }
+}

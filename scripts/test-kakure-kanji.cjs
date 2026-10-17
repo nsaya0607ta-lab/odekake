@@ -781,7 +781,7 @@ test("12. 正解の変更でクリア・完成した旧セーブも、報酬は�
 });
 
 test("12. 既存3問のIDを維持し、10ステージクリアの実績を実際に達成できる", () => {
-  assert.equal(STAGES.length, 16);
+  assert.equal(STAGES.length, 24);
   assert.deepEqual(STAGES.slice(0, 3).map((s) => s.id), ["s001-kan", "s002-kan", "s003-shou"]);
   let save = P.defaultSave();
   for (const stage of STAGES.slice(0, 10)) {
@@ -873,7 +873,7 @@ test("13. 人／入・牛／午・土／士を字形で区別し、日／曰も�
 });
 test("13. 既存10問のIDとセーブは保ち、新6問を続けて遊べる", () => {
   assert.deepEqual(STAGES.slice(0,10).map((s) => s.id), ["s001-kan","s002-kan","s003-shou","s004-mori","s005-mei","s006-shi","s007-sou","s008-i","s009-go","s010-sha"]);
-  assert.deepEqual(STAGES.slice(10).map((s) => s.number), [11,12,13,14,15,16]);
+  assert.deepEqual(STAGES.slice(10,16).map((s) => s.number), [11,12,13,14,15,16]);
   const first = E.submit(kan, E.newRound(kan,0), setOf("口"),1).round;
   const save = P.saveRound({ ...P.defaultSave(), coins:321 }, first);
   const stage = STAGES[10];
@@ -883,6 +883,124 @@ test("13. 既存10問のIDとセーブは保ち、新6問を続けて遊べる",
   const store = P.createKeyValueStore(memoryStorage());
   store.save(added);
   assert.deepEqual(store.load(),added);
+});
+
+// ---------- 14. ステージ17〜24：新8問 ----------
+const FURTHER = {
+  岩: ["一二山石口", "厂"],
+  花: ["一十化", "匕"],
+  苗: ["一二三十口日田士", ""],
+  男: ["一二十口日田士力", "另"],
+  町: ["一二十口日田士丁", "叮"],
+  村: ["一十木寸", "卜"],
+  困: ["一二十口木人大因", "囚"],
+  湖: ["一二十口古月", "胡汁沽"],
+};
+for (const [char, [main, secret]] of Object.entries(FURTHER)) {
+  const stage = STAGES.find((s) => s.kanji === char);
+  assert.ok(stage, `ステージ「${char}」が公開一覧にある`);
+  test(`14. 「${char}」の全候補・全${(1 << stage.strokes.length) - 1}組は一字だけ正解になる`, () => {
+    assert.deepEqual(sorted(E.mainAnswers(stage).map((a) => a.char)), sorted(main));
+    assert.deepEqual(sorted(E.secretAnswers(stage).map((a) => a.char)), sorted(secret));
+    const registered = new Map();
+    for (const a of stage.answers) for (const ids of a.strokeSets) {
+      const key = [...ids].sort((a,b) => a-b).join(",");
+      assert.ok(!registered.has(key), `${char} [${key}] の正解が重複しない`);
+      registered.set(key, a.char);
+      const first = E.submit(stage, E.newRound(stage, 0), ids, 1);
+      assert.deepEqual(first.round.found, [a.char]);
+      assert.equal(first.gained.discoveries.length, 1);
+      assert.equal(first.gained.points, E.pointsFor(a, 0, []));
+      for (const another of a.strokeSets) {
+        const duplicate = E.submit(stage, first.round, another, 2);
+        assert.equal(duplicate.result.kind, "duplicate");
+        assert.equal(duplicate.gained, null);
+        assert.deepEqual(duplicate.round.found, [a.char]);
+        assert.equal(duplicate.round.score, first.round.score);
+        assert.equal(duplicate.round.combo, first.round.combo);
+      }
+    }
+    for (let mask = 1; mask < 1 << stage.strokes.length; mask++) {
+      const ids = stage.strokes.filter((_, i) => mask & (1 << i)).map((stroke) => stroke.id);
+      const expected = registered.get(ids.join(","));
+      const result = J.judgeStrokes(stage, ids, new Set());
+      if (!expected) assert.notEqual(result.kind, "correct", `${char} [${ids}] は未登録`);
+      else {
+        assert.equal(result.kind, "correct");
+        assert.equal(result.answer.char, expected);
+        assert.deepEqual(result.answers.map((a) => a.char), [expected]);
+      }
+    }
+  });
+  test(`14. 「${char}」は通常クリア・報酬・保存再開・全発見まで遊べる`, () => {
+    let round = E.newRound(stage, 0);
+    for (const a of E.mainAnswers(stage)) round = E.submit(stage, round, a.strokeSets[0], 1).round;
+    assert.equal(round.clearedAt, 1);
+    assert.equal(round.completedAt, secret.length ? null : 1, "苗は通常クリアと全発見が同時");
+    const cleared = P.completeStage(P.saveRound(P.defaultSave(), round), stage, round, 2);
+    assert.ok(cleared.reward);
+    const store = P.createKeyValueStore(memoryStorage());
+    store.save(cleared.save);
+    let save = store.load();
+    for (const a of E.secretAnswers(stage)) {
+      const out = E.submit(stage, save.rounds[stage.id], a.strokeSets[0], 3);
+      assert.equal(out.result.kind, "correct");
+      round = out.round;
+      const reward = P.recordSecret(P.saveRound(save, round), stage, a.char, out.gained.points, true, 3);
+      assert.equal(reward.coins, P.SECRET_COINS);
+      save = reward.save;
+      assert.equal(P.recordSecret(save, stage, a.char, out.gained.points, true, 4).coins, 0);
+      store.save(save);
+      save = store.load();
+    }
+    assert.equal(round.completedAt, secret.length ? 3 : 1);
+    assert.deepEqual(sorted(round.found), sorted([...main, ...secret]));
+    assert.equal(P.completeStage(save, stage, round, 4).reward, null);
+    assert.equal(E.submit(stage, round, [1], 5).round, round, "完成後の連打で状態を変えない");
+    assert.deepEqual(P.reconcileSave(save, STAGES, 6), save);
+  });
+}
+test("14. 士／土・人／入・力／刀は実際の形で一字に決まり、離れた線を足さない", () => {
+  for (const char of ["苗", "男", "町"]) {
+    const stage = STAGES.find((s) => s.kanji === char);
+    const a = stage.answers.find((a) => a.char === "士");
+    const horizontalWidths = a.strokeSets[0].map((id) => stage.strokes.find((s) => s.id === id))
+      .filter((s) => s.kind === "横").map((s) => {
+        const xs = s.d.match(/-?\d+(\.\d+)?/g).map(Number).filter((_, i) => i % 2 === 0);
+        return Math.max(...xs) - Math.min(...xs);
+      });
+    assert.ok(horizontalWidths[0] > horizontalWidths[1], `${char} の士は上の横画が長い`);
+    assert.ok(!stage.answers.some((a) => ["土", "曰"].includes(a.char)));
+  }
+  for (const [char, ids, expected] of [["男",[6,7],"力"], ["困",[5,6],"人"]]) {
+    const stage = STAGES.find((s) => s.kanji === char);
+    const out = E.submit(stage, E.newRound(stage, 0), ids, 1);
+    assert.deepEqual(out.round.found, [expected]);
+    assert.equal(out.gained.discoveries.length, 1);
+  }
+  for (const [char, ids] of [["男",[5,6,7]], ["苗",[1,2,4,5,8]], ["村",[2,3,5,6,7]], ["村",[1,5]], ["町",[4,6]], ["湖",[4,11]], ["花",[1,7]]]) {
+    const stage = STAGES.find((s) => s.kanji === char);
+    assert.equal(J.judgeStrokes(stage, ids, new Set()).kind, "wrong", `${char} [${ids}] は切断・延長・移動しない`);
+  }
+  assert.ok(STAGES.find((s) => s.kanji === "男").answers.every((a) => a.char !== "刀"));
+  assert.ok(STAGES.find((s) => s.kanji === "困").answers.every((a) => a.char !== "入"));
+  assert.equal(KYOIKU_GRADES["士"], 5);
+  assert.equal(KYOIKU_GRADES["因"], 5);
+  assert.equal(KYOIKU_GRADES["寸"], 6);
+});
+test("14. 既存16問のID・セーブを保ち、全24問を連番で公開する", () => {
+  assert.deepEqual(STAGES.slice(0,16).map((s) => s.id), ["s001-kan","s002-kan","s003-shou","s004-mori","s005-mei","s006-shi","s007-sou","s008-i","s009-go","s010-sha","s011-kyuu","s012-tai","s013-sou","s014-hoshi","s015-aki","s016-hare"]);
+  assert.deepEqual(STAGES.map((s) => s.number), Array.from({length:24}, (_,i) => i+1));
+  assert.deepEqual(STAGES.slice(16).map((s) => s.kanji), Object.keys(FURTHER));
+  let save = { ...P.defaultSave(), coins:321 };
+  for (const stage of STAGES.slice(0,16)) save = P.saveRound(save, E.submit(stage, E.newRound(stage,0), stage.answers[0].strokeSets[0],1).round);
+  const previous = structuredClone(save.rounds);
+  for (const stage of STAGES.slice(16)) save = P.saveRound(save, E.submit(stage, E.newRound(stage,2), stage.answers[0].strokeSets[0],3).round);
+  for (const [id, round] of Object.entries(previous)) assert.deepEqual(save.rounds[id], round);
+  assert.equal(save.coins,321);
+  const store = P.createKeyValueStore(memoryStorage());
+  store.save(save);
+  assert.deepEqual(store.load(),save);
 });
 
 console.log(`\n${passed} tests passed`);
