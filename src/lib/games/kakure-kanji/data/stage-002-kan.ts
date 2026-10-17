@@ -74,9 +74,9 @@ export const STAGE_002_KAN: Stage = {
     {
       char: "大", readings: ["ダイ", "タイ", "おお"], meaning: "おおきい", rule: "loose",
       strokeSets: [[11, 12, 13]], tier: 2, grade: 1,
-      evidence: "下から左右に分かれる人の形に、分かれ目を通る11画目の横画を足すと大に見立てられる。左払いの上の長さは問わない。",
+      evidence: "12画目の左払いは11画目の横画より上へ突き出し、横画の近くで13画目の右払いと分かれる。横画と左右の払い3画を、そのまま大として取り出せる。",
       partHint: "左右の払いに、下の長い横画を足すよ",
-      verification: { status: "verified", note: "横・左払い・右払いの3画。横画が左右の払いの分かれ目に通る配置を確認。" },
+      verification: { status: "verified", note: "横・左払い・右払いの3画。左払いの上端y32は横画のy68〜71より上にあり、大に必要な上への突き出しと払いの分岐を確認。" },
     },
     {
       char: "夫", readings: ["フ", "フウ", "おっと"], meaning: "おっと", rule: "loose",

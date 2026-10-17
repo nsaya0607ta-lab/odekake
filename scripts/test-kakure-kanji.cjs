@@ -417,7 +417,8 @@ test("9. 似た字の分類が構造データと矛盾しない（画が無い=m
     for (const n of stage.nearMisses) {
       const structure = STROKE_STRUCTURES[n.char];
       if (!structure) continue;
-      const formableByKinds = isSubMultiset(structure.map(looseKind), all);
+      const variants = [structure, ...(STROKE_STRUCTURE_VARIANTS[n.char] ?? [])];
+      const formableByKinds = variants.some((variant) => isSubMultiset(variant.map(looseKind), all));
       if (n.category === "missing") assert.equal(formableByKinds, false, `${n.char} は本当に画が足りない`);
       if (n.category === "shape" || n.category === "position") assert.equal(formableByKinds, true, `${n.char} は画の種類だけなら足りている`);
     }
@@ -608,7 +609,7 @@ test("11. 「称」は日本の7画目が横画。丁・下・小と、はなれ
 
 // ---------- 12. ステージ4〜10：全候補・同じ画の見立て・10問実績 ----------
 const SEVEN = {
-  森: ["一二十木林人大八", "卜杕"],
+  森: ["一二十木林人八", "卜"],
   明: ["一二口日月", ""],
   思: ["一二十口日田心士志", ""],
   想: ["一二三十木口日目心相旧", "卜"],
@@ -796,8 +797,8 @@ test("12. 既存3問のIDを維持し、10ステージクリアの実績を実�
 
 // ---------- 13. ステージ11〜16：新6問 ----------
 const MORE = {
-  休: ["一十木人大八", "什"],
-  体: ["一二十木本人大八休仁", "什"],
+  休: ["一十木人八", "什"],
+  体: ["一二十木本人八休仁", "什"],
   早: ["一二三十口日干丁", "旦"],
   星: ["一二三十口日生土牛", "旦"],
   秋: ["一十千木火人八", "禾卜"],
@@ -893,7 +894,7 @@ const FURTHER = {
   男: ["一二十口日田士力", "另"],
   町: ["一二十口日田士丁", "叮"],
   村: ["一十木寸", "卜"],
-  困: ["一二十口木人大因", "囚"],
+  困: ["一二十口木人", "囚"],
   湖: ["一二十口古月", "胡汁沽"],
 };
 for (const [char, [main, secret]] of Object.entries(FURTHER)) {
@@ -1001,6 +1002,58 @@ test("14. 既存16問のID・セーブを保ち、全24問を連番で公開す�
   const store = P.createKeyValueStore(memoryStorage());
   store.save(save);
   assert.deepEqual(store.load(),save);
+});
+
+// ---------- 15. 字形の再確認：筆画の種類が同じでも、必要な部分を省かない ----------
+const INVALID_SHAPES = [
+  ["森", "大", [1, 3, 4]], ["森", "大", [9, 11, 12]],
+  ["森", "杕", [5, 6, 7, 8, 9, 11, 12]],
+  ["休", "大", [3, 5, 6]], ["体", "大", [3, 5, 6]],
+  ["困", "大", [3, 5, 6]], ["困", "因", [1, 2, 3, 5, 6, 7]],
+];
+test("15. 木から縦画を外した7組は大・杕・因にせず、ヒントにも残さない", () => {
+  for (const [kanji, char, ids] of INVALID_SHAPES) {
+    const stage = STAGES.find((s) => s.kanji === kanji);
+    assert.equal(J.judgeStrokes(stage, ids, new Set()).kind, "wrong", `${kanji}→${char} [${ids}]`);
+    assert.ok(stage.answers.every((a) => a.char !== char));
+    assert.ok(stage.nearMisses.some((m) => m.char === char && m.category === "shape"));
+    const round = E.newRound(stage, 0);
+    assert.equal(E.applyHint(stage, round, char, "reveal", 1), round);
+  }
+});
+test("15. 大は横画より上に左払いが突き出す形だけを認め、漢の大・夫は残す", () => {
+  const hasTop = (stage, ids) => {
+    const strokes = ids.map((id) => stage.strokes.find((s) => s.id === id));
+    const horizontal = strokes.find((s) => s.kind === "横");
+    const left = strokes.find((s) => s.kind === "左払い");
+    const startY = Number(left.d.match(/^M\s*(-?[\d.]+)[ ,]+(-?[\d.]+)/)[2]);
+    const ys = horizontal.d.match(/-?\d+(\.\d+)?/g).map(Number).filter((_, i) => i % 2 === 1);
+    return startY + (horizontal.width ?? 5.2) / 2 < Math.min(...ys);
+  };
+  for (const stage of STAGES) for (const answer of stage.answers.filter((a) => a.char === "大")) {
+    for (const ids of answer.strokeSets) assert.ok(hasTop(stage, ids), `${stage.kanji}の大に上への突き出しがある`);
+  }
+  for (const [kanji, char, ids] of INVALID_SHAPES.filter(([, ch]) => ch === "大")) {
+    assert.equal(hasTop(STAGES.find((s) => s.kanji === kanji), ids), false, `${kanji}の3画では上の部分が欠ける`);
+  }
+  const stage = STAGES.find((s) => s.kanji === "漢");
+  for (const [ids, char] of [[[11, 12, 13], "大"], [[10, 11, 12, 13], "夫"]]) {
+    assert.equal(J.judgeStrokes(stage, ids, new Set()).answer.char, char);
+  }
+});
+test("15. 全24問の土・士は、選択した実際の横画の長短に合う片方だけになる", () => {
+  for (const stage of STAGES) for (const answer of stage.answers.filter((a) => ["土", "士"].includes(a.char))) {
+    assert.ok(!stage.answers.some((a) => a.char === (answer.char === "土" ? "士" : "土")));
+    for (const ids of answer.strokeSets) {
+      const horizontals = ids.map((id) => stage.strokes.find((s) => s.id === id)).filter((s) => s.kind === "横");
+      assert.equal(horizontals.length, 2);
+      const width = (stroke) => {
+        const xs = stroke.d.match(/-?\d+(\.\d+)?/g).map(Number).filter((_, i) => i % 2 === 0);
+        return Math.max(...xs) - Math.min(...xs);
+      };
+      assert.equal(width(horizontals[0]) > width(horizontals[1]) ? "士" : "土", answer.char, `${stage.kanji} [${ids}]`);
+    }
+  }
 });
 
 console.log(`\n${passed} tests passed`);

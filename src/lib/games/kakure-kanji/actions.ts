@@ -20,7 +20,9 @@ export type KanjiResponse = { snapshot: KanjiSnapshot; event: KanjiEvent; replay
 
 /** コインの額・時刻・正解はサーバーが計算する。クライアントは操作だけを送る。 */
 export function applyKanjiAction(stored: SaveData | null, balance: number, action: KanjiAction, now: number): { save: SaveData; event: KanjiEvent; delta: number } {
-  let save = stored ? { ...stored, coins: balance } : null;
+  // 正解表の修正は移行済みアカウントにも適用する。補正でクリアした報酬も
+  // この操作の差分として財布・記録と同時に確定し、rewardedAt で二重払いを防ぐ。
+  let save = stored ? reconcileSave({ ...stored, coins: balance }, STAGES, now) : null;
   const event: KanjiEvent = {};
   if (action.type === "initialize") {
     if (!save) {

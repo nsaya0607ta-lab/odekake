@@ -1303,7 +1303,7 @@ const STAGE_DATA: Omit<Stage, "strokes">[] = [
     "number": 23,
     "kanji": "困",
     "reading": "コン・こまる",
-    "difficulty": "上級",
+    "difficulty": "中級",
     "structure": "外の四角の中に木がある。外の四角を残しながら、中の木の線を減らす取り出し方もある。",
     "answers": [
       {
@@ -1458,60 +1458,6 @@ const STAGE_DATA: Omit<Stage, "strokes">[] = [
         }
       },
       {
-        "char": "大",
-        "readings": [
-          "ダイ",
-          "タイ",
-          "おおきい"
-        ],
-        "meaning": "おおきい",
-        "rule": "loose",
-        "strokeSets": [
-          [
-            3,
-            5,
-            6
-          ]
-        ],
-        "evidence": "内側の木から、縦画だけを外すよ。",
-        "tier": 2,
-        "grade": 1,
-        "rare": false,
-        "partHint": "内側の木から、縦画だけを外すよ。",
-        "verification": {
-          "status": "verified",
-          "note": "KanjiVGの原図と抽出した筆画を照合。線を切らずに使い、向き・接続・位置を確認。同じ組の正解は一字だけ。"
-        }
-      },
-      {
-        "char": "因",
-        "readings": [
-          "イン",
-          "よる"
-        ],
-        "meaning": "原因・もとになること",
-        "rule": "loose",
-        "strokeSets": [
-          [
-            1,
-            2,
-            3,
-            5,
-            6,
-            7
-          ]
-        ],
-        "evidence": "外の四角と、内側の木から大になる3画をえらぶよ。",
-        "tier": 3,
-        "grade": 5,
-        "rare": false,
-        "partHint": "外の四角と、内側の木から大になる3画をえらぶよ。",
-        "verification": {
-          "status": "verified",
-          "note": "KanjiVGの原図と抽出した筆画を照合。線を切らずに使い、向き・接続・位置を確認。同じ組の正解は一字だけ。"
-        }
-      },
-      {
         "char": "囚",
         "readings": [
           "シュウ",
@@ -1541,6 +1487,18 @@ const STAGE_DATA: Omit<Stage, "strokes">[] = [
     ],
     "nearMisses": [
       {
+        "char": "大",
+        "reading": "ダイ（おおきい）",
+        "category": "shape",
+        "reason": "木の縦画を外すと、左払いが横画より上に突き出しません。大に必要な上の部分を足したり伸ばしたりはできないので、正解にはしません。"
+      },
+      {
+        "char": "因",
+        "reading": "イン",
+        "category": "shape",
+        "reason": "内側の木から縦画を外すと、大に必要な上への突き出しがなくなります。外の四角を加えても、因にはなりません。"
+      },
+      {
         "char": "入",
         "reading": "ニュウ",
         "category": "shape",
@@ -1568,7 +1526,7 @@ const STAGE_DATA: Omit<Stage, "strokes">[] = [
     "verification": {
       "status": "verified",
       "checkedOn": "2026-10-17",
-      "note": "KanjiVGの筆画図と抽出した線の形・接続・位置を照合。読み・学年はKANJIDIC2。全候補と除外理由は docs/kakure-kanji-answers-017-024.md。同じ筆画の組の正解は一字だけ。"
+      "note": "KanjiVGの筆画図と抽出した線の形・接続・位置を照合。読み・学年はKANJIDIC2。全候補と除外理由は docs/kakure-kanji-answers-017-024.md。同じ筆画の組の正解は一字だけ。 2026-10-17再確認：横画より上への突き出しが欠ける大と、その形を前提にする派生字を除外。"
     }
   },
   {

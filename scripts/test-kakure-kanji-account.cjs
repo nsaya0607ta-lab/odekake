@@ -32,6 +32,35 @@ test("初期残高は共通財布。旧残高を加算せず、発見・実績�
   assert.equal(applyKanjiAction(result.save,4321,{type:"initialize",legacy:P.defaultSave()},now).delta,0);
   assert.equal(applyKanjiAction(null,0,{type:"initialize"},now).save.coins,0);
 });
+test("既存アカウントも正解の修正を読み直し、発見・ヒントを整理して獲得済みの記録は保つ",()=>{
+  for(const [kanji,removed] of [["森",["大","杕"]],["休",["大"]],["体",["大"]],["困",["大","因"]]]){
+    const stage=STAGES.find(s=>s.kanji===kanji);
+    const old={...E.newRound(stage,1),found:["一",...removed],revealed:removed,hints:Object.fromEntries(removed.map(ch=>[ch,["reading","reveal"]])),score:987,history:removed.map(text=>({text,kind:"correct",at:2}))};
+    const record={clears:1,bestStars:3,bestScore:1234,firstClearedAt:1,secretsFound:kanji==="森"?["杕"]:[]};
+    const save={...P.defaultSave(),coins:99999,totalPoints:1234,stats:{correct:20,wrong:2},achievements:{first_correct:1},rounds:{[stage.id]:old},stages:{[stage.id]:record}};
+    const before=structuredClone(save);
+    const out=applyKanjiAction(save,4321,{type:"login"},now);
+    assert.deepEqual(out.save.rounds[stage.id].found,["一"]);
+    assert.deepEqual(out.save.rounds[stage.id].revealed,[]);assert.deepEqual(out.save.rounds[stage.id].hints,{});assert.deepEqual(out.save.rounds[stage.id].history,[]);
+    assert.deepEqual(out.save.stages[stage.id],{...record,secretsFound:[]});
+    for(const field of ["totalPoints","stats","achievements"])assert.deepEqual(out.save[field],save[field]);
+    assert.equal(out.save.rounds[stage.id].score,987);assert.equal(out.delta,20);assert.equal(out.save.coins,4341);
+    assert.deepEqual(save,before);assert.deepEqual(applyKanjiAction(out.save,4341,{type:"login"},now).save,out.save);
+  }
+});
+test("除外により残りの正解が揃ったアカウントは一度だけクリア報酬を受け取る",()=>{
+  const stage=STAGES.find(s=>s.kanji==="困");
+  const round={...E.newRound(stage,1),found:E.mainAnswers(stage).map(a=>a.char),score:900};
+  const stored=P.saveRound(P.defaultSave(),round);
+  const action={type:"settings",settings:stored.settings};
+  const first=applyKanjiAction(stored,100,action,now);
+  assert.ok(first.delta>0);assert.equal(first.save.rounds[stage.id].rewardedAt,now);assert.equal(first.save.stages[stage.id].clears,1);
+  const repeated=applyKanjiAction(first.save,first.save.coins,action,now+1);
+  assert.equal(repeated.delta,0);assert.deepEqual(repeated.save,first.save);
+  const paid={...first.save,rounds:{[stage.id]:{...first.save.rounds[stage.id],found:[...round.found,"大","因"]}}};
+  const again=applyKanjiAction(paid,first.save.coins,action,now+2);
+  assert.equal(again.delta,0);assert.equal(again.save.stages[stage.id].clears,1);assert.deepEqual(again.save.rounds[stage.id].found,round.found);
+});
 test("ログインはサーバーの日本時間で1日1回。端末の残高を使わない",()=>{
   let out=applyKanjiAction(P.defaultSave(),100,{type:"login"},now);
   assert.equal(out.delta,20);assert.equal(out.save.coins,120);
