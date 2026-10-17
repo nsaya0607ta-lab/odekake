@@ -18,10 +18,10 @@ const kleeOne = Klee_One({
 });
 
 export default async function KakureKanjiPage() {
-  await requireUser();
+  const { user } = await requireUser();
   return (
     <div className={kleeOne.variable}>
-      <KakureKanjiGame />
+      <KakureKanjiGame key={user.id} userId={user.id} />
     </div>
   );
 }

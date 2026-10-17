@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useId, useRef, type ReactNode } from "react";
+import { BlueCoinArt } from "@/components/coin-art";
 import styles from "./kakure-kanji.module.css";
 
 /** 下から出るシート（center のときはまんなかのダイアログ）。Esc・背景タップで閉じる */
@@ -74,10 +75,10 @@ export function Stars({ value, max = 3, label }: { value: number; max?: number; 
   );
 }
 
-export function CoinPill({ coins, label = "墨コイン" }: { coins: number; label?: string }) {
+export function CoinPill({ coins, label = "青コイン" }: { coins: number; label?: string }) {
   return (
     <span className={styles.pill} aria-label={`${label} ${coins}枚`}>
-      <span className={styles.coinDot} aria-hidden="true" />
+      <BlueCoinArt className={styles.coinDot} />
       {coins.toLocaleString("ja-JP")}
     </span>
   );

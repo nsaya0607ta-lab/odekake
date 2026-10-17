@@ -4,8 +4,8 @@ import { canonicalAnswerChar, hintCount, isSecret, reconcileRound, secretAnswers
 
 /**
  * 進みぐあい（セーブデータ）と、コイン・経験値・レベル・実績・称号の決まり。
- * 今はこの端末（localStorage）に保存する。ProgressStore を差しかえればクラウド保存にできる。
- * コインはこのゲームの中だけで使う「墨コイン」で、アプリのほかのコインとは別。
+ * 本番ではサーバーで計算し、アカウントの記録と青コインを同時に保存する。localStorage は移行・控え用。
+ * coins はアプリ共通の青コインの残高。純粋関数では入出金の差分を計算する。
  */
 
 export const SAVE_VERSION = 1;
@@ -42,7 +42,7 @@ const saveSchema = z.object({
       bestStars: z.number().int().min(0).max(3),
       bestScore: z.number().min(0),
       firstClearedAt: z.number().nullable(),
-      /** これまでに一度でも見つけたシークレット（はじめて見つけたときだけ墨コインをわたす） */
+      /** これまでに一度でも見つけたシークレット（はじめて見つけたときだけ青コインをわたす） */
       secretsFound: z.array(z.string()).default([]),
     }),
   ),
@@ -391,11 +391,11 @@ export function completeStage(save: SaveData, stage: Stage, round: RoundState, n
   };
 }
 
-/** シークレットを、そのステージではじめて見つけたときの墨コイン */
+/** シークレットを、そのステージではじめて見つけたときの青コイン */
 export const SECRET_COINS = 10;
 
 /**
- * クリアのあとにシークレットを見つけたときの記録。点数を累計に足し、はじめて見つけた字なら墨コインをわたす。
+ * クリアのあとにシークレットを見つけたときの記録。点数を累計に足し、はじめて見つけた字なら青コインをわたす。
  * （クリアの前に見つけたシークレットの点数は、クリアの報酬のときにまとめて累計に入る）
  */
 export function recordSecret(

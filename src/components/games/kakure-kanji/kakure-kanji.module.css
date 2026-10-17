@@ -143,11 +143,23 @@
   font-variant-numeric: tabular-nums;
 }
 .coinDot {
-  width: 14px;
-  height: 14px;
-  border-radius: 999px;
-  background: radial-gradient(circle at 35% 30%, #6d6459, #1f1b16 70%);
-  box-shadow: 0 0 0 1.5px var(--kin);
+  width: 19px;
+  height: 19px;
+  flex-shrink: 0;
+}
+.accountError {
+  position: fixed;
+  z-index: 200;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: min(90vw, 360px);
+  padding: 22px;
+  border: 1px solid var(--card-edge);
+  border-radius: 18px;
+  background: var(--card);
+  box-shadow: 0 8px 40px #0003;
+  text-align: center;
 }
 .scorePop {
   position: absolute;

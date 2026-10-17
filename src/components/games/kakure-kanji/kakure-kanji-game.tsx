@@ -7,19 +7,10 @@ import type { Difficulty, Stage } from "@/lib/games/kakure-kanji/types";
 import { mainAnswers, secretAnswers } from "@/lib/games/kakure-kanji/engine";
 import {
   ACHIEVEMENTS,
-  claimLoginBonus,
   clearedStageCount,
-  createKeyValueStore,
-  createMemoryStore,
-  defaultSave,
-  dropRound,
   expToNext,
-  japanDate,
-  reconcileSave,
-  skipStage,
   titleFor,
   type AchievementId,
-  type ProgressStore,
   type SaveData,
   type Settings,
 } from "@/lib/games/kakure-kanji/progress";
@@ -28,6 +19,7 @@ import { AnswerExplain, PlayScreen } from "./play";
 import { playSfx } from "./sound";
 import { CoinPill, Segment, Sheet, Stars, useVisualViewport } from "./ui";
 import styles from "./kakure-kanji.module.css";
+import { useKanjiAccount } from "./use-kanji-account";
 
 type Screen = { name: "home" } | { name: "stages" } | { name: "play"; stageId: string } | { name: "review"; stageId: string; skipped: boolean };
 type Overlay = "settings" | "achievements" | "howto" | null;
@@ -40,60 +32,17 @@ const DIFFICULTIES: { id: Difficulty; note: string }[] = [
   { id: "達人", note: "見つけにくい漢字がまじる" },
 ];
 
-export function KakureKanjiGame() {
+export function KakureKanjiGame({ userId }: { userId: string }) {
   const rootRef = useRef<HTMLDivElement>(null);
   useVisualViewport(rootRef);
 
-  const storeRef = useRef<ProgressStore | null>(null);
-  const saveRef = useRef<SaveData | null>(null);
-  const [save, setSave] = useState<SaveData | null>(null);
-  const [storageWarning, setStorageWarning] = useState<string | null>(null);
+  const { save, busy, error, act, retry } = useKanjiAccount(userId);
   const [screen, setScreen] = useState<Screen>({ name: "home" });
   const [overlay, setOverlay] = useState<Overlay>(null);
   const [toast, setToast] = useState<{ text: string; key: number } | null>(null);
   const [systemDark, setSystemDark] = useState(false);
 
   const showToast = useCallback((text: string) => setToast({ text, key: Date.now() + Math.random() }), []);
-
-  // 読みこみ（この端末の保存データ）とログインボーナス
-  useEffect(() => {
-    let store: ProgressStore;
-    try {
-      const probe = "__kk_probe__";
-      window.localStorage.setItem(probe, "1");
-      window.localStorage.removeItem(probe);
-      store = createKeyValueStore(window.localStorage);
-    } catch {
-      store = createMemoryStore();
-      setStorageWarning("この端末では記録を保存できません（閉じると最初からになります）");
-    }
-    storeRef.current = store;
-    let data = reconcileSave(store.load(), STAGES, Date.now());
-    const bonus = claimLoginBonus(data, japanDate(Date.now()));
-    data = bonus.save;
-    saveRef.current = data;
-    setSave(data);
-    try {
-      store.save(data);
-    } catch {
-      setStorageWarning("記録を保存できませんでした。端末の空き容量を確かめてください");
-    }
-    if (bonus.bonus) {
-      const { coins, streak } = bonus.bonus;
-      window.setTimeout(() => showToast(`ログインボーナス 墨コイン+${coins}枚${streak > 1 ? `（${streak}日連続）` : ""}`), 400);
-    }
-  }, [showToast]);
-
-  const commit = useCallback((next: SaveData) => {
-    saveRef.current = next;
-    setSave(next);
-    try {
-      storeRef.current?.save(next);
-    } catch {
-      setStorageWarning("記録を保存できませんでした。端末の空き容量を確かめてください");
-    }
-  }, []);
-  const readSave = useCallback(() => saveRef.current ?? defaultSave(), []);
 
   useEffect(() => {
     const media = window.matchMedia("(prefers-color-scheme: dark)");
@@ -119,21 +68,19 @@ export function KakureKanjiGame() {
 
   const theme = save ? (save.settings.theme === "system" ? (systemDark ? "dark" : "light") : save.settings.theme) : systemDark ? "dark" : "light";
   const updateSettings = (patch: Partial<Settings>) => {
-    const current = readSave();
-    commit({ ...current, settings: { ...current.settings, ...patch } });
+    if (save) void act({ type: "settings", settings: { ...save.settings, ...patch } });
   };
 
   const stage = screen.name === "play" || screen.name === "review" ? findStage(screen.stageId) : undefined;
 
   /** ステージを開く。シークレットまで全部見つけたラウンドは終わっているので、新しく始める */
-  const startStage = (id: string) => {
-    const current = readSave();
-    if (current.rounds[id]?.completedAt != null) commit(dropRound(current, id));
-    setScreen({ name: "play", stageId: id });
+  const startStage = async (id: string) => {
+    if (await act({ type: "start", stageId: id })) setScreen({ name: "play", stageId: id });
   };
 
   return (
     <div ref={rootRef} className={styles.root} data-theme={theme}>
+      <div style={{ display: "contents" }} inert={busy || !!error ? true : undefined}>
       {!save ? (
         <div className={styles.home} aria-busy="true" />
       ) : screen.name === "play" && stage ? (
@@ -141,13 +88,12 @@ export function KakureKanjiGame() {
           key={stage.id}
           stage={stage}
           save={save}
-          commit={commit}
-          readSave={readSave}
+          act={act}
+          busy={busy}
           sound={save.settings.sound}
           onExit={() => setScreen({ name: "stages" })}
-          onSkip={() => {
-            commit(skipStage(readSave(), stage.id));
-            setScreen({ name: "review", stageId: stage.id, skipped: true });
+          onSkip={async () => {
+            if (await act({ type: "skip", stageId: stage.id })) setScreen({ name: "review", stageId: stage.id, skipped: true });
           }}
           onReview={() => setScreen({ name: "review", stageId: stage.id, skipped: false })}
           onSettings={() => setOverlay("settings")}
@@ -189,19 +135,18 @@ export function KakureKanjiGame() {
             />
           </div>
           <ResetRow
-            onReset={() => {
-              const fresh = { ...defaultSave(), settings: readSave().settings, login: readSave().login };
-              commit(fresh);
+            onReset={async () => {
+              if (!await act({ type: "reset" })) return;
               setOverlay(null);
               setScreen({ name: "home" });
-              showToast("記録を最初にもどしました");
+              showToast("挑戦中の記録を最初にもどしました");
             }}
           />
           <p className={styles.note}>
-            効果音の大きさは、アプリの「タップ音」の音量に合わせています。記録はこの端末に保存されます（墨コインはこのゲームの中だけで使うコインで、アプリのほかのコインとは別です）。
+            青コインはアプリ共通です。ヒントに使ったり、家具やガチャにも使えます。記録はアカウントに保存されます。効果音はアプリの「タップ音」の音量に合わせています。
           </p>
           <p className={styles.note}>
-            ステージ4〜10の筆画：<a href="https://kanjivg.tagaini.net/" target="_blank" rel="noreferrer">KanjiVG</a>
+            ステージ4〜24の筆画：<a href="https://kanjivg.tagaini.net/" target="_blank" rel="noreferrer">KanjiVG</a>
             {" "}（CC BY-SA 3.0）。<a href="/licenses/kakure-kanji/README.txt" target="_blank" rel="noreferrer">出典・変更内容・原図とライセンス</a>
           </p>
         </Sheet>
@@ -241,11 +186,9 @@ export function KakureKanjiGame() {
         </Sheet>
       )}
 
-      {storageWarning && (
-        <p role="alert" className={styles.toast} style={{ animation: "none", bottom: "calc(env(safe-area-inset-bottom) + 12px)", whiteSpace: "normal", width: "max-content", maxWidth: "92vw", borderRadius: 14 }}>
-          {storageWarning}
-        </p>
-      )}
+      </div>
+      {busy && <p className={styles.toast} role="status">青コインと記録を確認中…</p>}
+      {error && <div role="alert" className={styles.accountError}><p>{error}</p><button type="button" className={styles.secondary} onClick={retry}>再試行</button></div>}
       {toast && (
         <p key={toast.key} className={styles.toast} role="status">
           {toast.text}
@@ -259,10 +202,11 @@ function ResetRow({ onReset }: { onReset: () => void }) {
   const [armed, setArmed] = useState(false);
   return (
     <div className={styles.settingRow}>
-      <span>記録を消す</span>
+      <span>挑戦中の記録を消す</span>
       <button type="button" className={`${styles.secondary} ${styles.danger}`} style={{ height: 36, padding: "0 12px", fontSize: 12 }} onClick={() => (armed ? onReset() : setArmed(true))}>
         {armed ? "本当に消す" : "最初からにする"}
       </button>
+      <small>青コイン・クリア・実績は引き継ぎます</small>
     </div>
   );
 }
@@ -353,7 +297,7 @@ function HomeScreen({
             </button>
           </div>
           <p className={styles.note} style={{ textAlign: "center" }}>
-            {save.login.streak > 0 ? `ログイン${save.login.streak}日目 ・ ` : ""}毎日はじめて開くと墨コインがもらえます
+            {save.login.streak > 0 ? `ログイン${save.login.streak}日目 ・ ` : ""}毎日はじめて開くと青コインがもらえます
           </p>
         </div>
       </main>
@@ -539,7 +483,7 @@ function HowTo() {
         <b>2.</b> 黒くした線が漢字になったと思ったら <b>OK</b>。合っていれば答えの一覧に入ります。<b>小学校で習う字</b>を全部見つけるとクリアです。
       </p>
       <p style={{ marginTop: 8 }}>
-        <b>🔒 シークレット</b>：小学校で習わない難しい字は「シークレット」の枠に入っています（いくつあるかは見えます）。クリアには入りませんが、クリアのあともつづけてさがせます。はじめて見つけると墨コインがもらえます。
+        <b>🔒 シークレット</b>：小学校で習わない難しい字は「シークレット」の枠に入っています（いくつあるかは見えます）。クリアには入りませんが、クリアのあともつづけてさがせます。はじめて見つけると青コインがもらえます。
       </p>
       <p style={{ marginTop: 8 }}>
         <b>答えになる取り出し方</b>
@@ -557,7 +501,7 @@ function HowTo() {
         字の形は日本の常用漢字（新字体）の書き方が基準です。答えは1問ずつ人が確かめたものだけです。
       </p>
       <p style={{ marginTop: 8 }}>
-        <b>ヒント</b>は墨コインで使えます（読み方・画数・一部を見る・答えを開く）。まちがえても点は減りません。
+        <b>ヒント</b>は青コインで使えます（読み方・画数・一部を見る・答えを開く）。まちがえても点は減りません。
       </p>
     </div>
   );

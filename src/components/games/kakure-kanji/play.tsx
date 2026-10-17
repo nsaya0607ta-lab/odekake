@@ -1,20 +1,18 @@
 "use client";
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import type { KanjiAction, KanjiResponse } from "@/lib/games/kakure-kanji/actions";
 import type { Answer, Stage } from "@/lib/games/kakure-kanji/types";
 import {
   HINTS,
   HINT_ORDER,
   canUseHint,
-  applyHint,
   hintCount,
   isSecret,
   mainAnswers,
-  newRound,
   partHintStrokes,
   secretAnswers,
   strokeCountOf,
-  submit,
   totalAnswers,
   type HintKind,
   type RoundState,
@@ -22,13 +20,7 @@ import {
 import { normalizeSelection, resultMessage, type JudgeResult } from "@/lib/games/kakure-kanji/judge";
 import {
   ACHIEVEMENTS,
-  buyHint,
-  completeStage,
-  dropRound,
   expToNext,
-  recordAnswers,
-  recordSecret,
-  saveRound,
   titleFor,
   type AchievementId,
   type ClearReward,
@@ -49,8 +41,8 @@ const RULE_LABEL = { component: "部品をそのまま取り出す", strokes: "�
 export function PlayScreen({
   stage,
   save,
-  commit,
-  readSave,
+  act,
+  busy,
   sound,
   onExit,
   onSkip,
@@ -60,10 +52,8 @@ export function PlayScreen({
 }: {
   stage: Stage;
   save: SaveData;
-  /** 新しいセーブデータを反映して保存する */
-  commit: (next: SaveData) => void;
-  /** いちばん新しいセーブデータ（連打しても古い状態から計算しないように） */
-  readSave: () => SaveData;
+  act: (action: KanjiAction) => Promise<KanjiResponse | null>;
+  busy: boolean;
   sound: boolean;
   onExit: () => void;
   onSkip: () => void;
@@ -77,12 +67,6 @@ export function PlayScreen({
   const secrets = useMemo(() => secretAnswers(stage), [stage]);
   const answers = useMemo(() => [...mains, ...secrets], [mains, secrets]);
   const total = totalAnswers(stage);
-
-  // はじめて開いたとき・「もう一度」のときは、新しいラウンドを作る
-  useEffect(() => {
-    const current = readSave();
-    if (!current.rounds[stage.id]) commit(saveRound(current, newRound(stage, Date.now())));
-  }, [stage, round, commit, readSave]);
 
   const [selected, setSelected] = useState<Set<number>>(() => new Set());
   const [feedback, setFeedback] = useState<Feedback>({ tone: "plain", text: START_MESSAGE, key: 0 });
@@ -117,12 +101,12 @@ export function PlayScreen({
     setFlyers((list) => [...list, { key: seq.current++, char, from: board, to: slot }]);
   }, []);
 
-  const handleSubmit = useCallback(() => {
-    const current = readSave();
-    const live = current.rounds[stage.id];
-    if (!live || live.completedAt !== null) return;
-    const now = Date.now();
-    const outcome = submit(stage, live, selected, now);
+  const handleSubmit = useCallback(async () => {
+    const live = save.rounds[stage.id];
+    if (busy || !live || live.completedAt !== null) return;
+    const response = await act({ type: "submit", stageId: stage.id, strokes: [...selected] });
+    const outcome = response?.event.outcome;
+    if (!outcome) return;
     const result = outcome.result;
     if (!result) return;
     const key = seq.current++;
@@ -133,29 +117,9 @@ export function PlayScreen({
       return;
     }
 
-    let next = saveRound(current, outcome.round);
-    const wrong = result.kind === "wrong" || result.kind === "whole" ? 1 : 0;
-    const recorded = recordAnswers(next, outcome.gained ? 1 : 0, wrong, now);
-    next = recorded.save;
-    // クリアでとれた実績はクリア画面に出すので、トーストには「初めての正解」などだけを出す
-    const unlocked: AchievementId[] = [...recorded.unlocked];
-
-    let secretCoins = 0;
-    for (const discovery of outcome.gained?.discoveries ?? []) {
-      if (!discovery.secret) continue;
-      const secret = recordSecret(next, stage, discovery.answer.char, discovery.points, live.clearedAt !== null, now);
-      next = secret.save;
-      secretCoins += secret.coins;
-      unlocked.push(...secret.achievements);
-    }
-
-    let reward: ClearReward | null = null;
-    if (outcome.cleared) {
-      const done = completeStage(next, stage, outcome.round, now);
-      next = done.save;
-      reward = done.reward;
-    }
-    commit(next);
+    const unlocked = response?.event.unlocked ?? [];
+    const secretCoins = response?.event.secretCoins ?? 0;
+    const reward = response?.event.reward ?? null;
 
     if (outcome.gained) {
       const { discoveries, points, secret } = outcome.gained;
@@ -165,7 +129,7 @@ export function PlayScreen({
       setFeedback({
         tone: "good",
         text: secret
-          ? `シークレット発見！「${label}」 +${points}点${secretCoins ? `・墨コイン+${secretCoins}枚` : ""}`
+          ? `シークレット発見！「${label}」 +${points}点${secretCoins ? `・青コイン+${secretCoins}枚` : ""}`
           : `「${label}」を見つけた！ +${points}点`,
         key,
       });
@@ -204,17 +168,14 @@ export function PlayScreen({
         playSfx("clear", sound);
       }, 1200);
     }
-  }, [commit, launchFlyer, later, onAchievements, readSave, selected, sound, stage]);
+  }, [act, busy, launchFlyer, later, onAchievements, save, selected, sound, stage]);
 
-  const spendHint = (answerChar: string, kind: HintKind) => {
-    const current = readSave();
-    const live = current.rounds[stage.id];
-    if (!live || !canUseHint(live, answerChar, kind)) return;
-    const now = Date.now();
-    const bought = buyHint(current, stage.id, answerChar, kind, HINTS[kind].cost, now);
-    if (!bought.ok) return;
-    const nextRound = applyHint(stage, live, answerChar, kind, now);
-    let next = saveRound(bought.save, nextRound);
+  const spendHint = async (answerChar: string, kind: HintKind) => {
+    const live = save.rounds[stage.id];
+    if (busy || !live || !canUseHint(live, answerChar, kind)) return;
+    const response = await act({ type: "hint", stageId: stage.id, answer: answerChar, kind });
+    const nextRound = response?.snapshot.save?.rounds[stage.id];
+    if (!response || !nextRound) return;
     playSfx("hint", sound);
     if (kind === "reveal") {
       setHintTarget(null);
@@ -228,10 +189,8 @@ export function PlayScreen({
       later(() => setPop({ chars: opened, key }), 600);
       if (nextRound.completedAt !== null && live.completedAt === null && live.clearedAt !== null) later(() => setComplete(true), 1000);
       if (nextRound.clearedAt !== null && live.clearedAt === null) {
-        const done = completeStage(next, stage, nextRound, now);
-        next = done.save;
-        if (done.reward) {
-          const reward = done.reward;
+        if (response.event.reward) {
+          const reward = response.event.reward;
           later(() => {
             setClear({ reward, round: nextRound });
             playSfx("clear", sound);
@@ -239,13 +198,12 @@ export function PlayScreen({
         }
       }
     }
-    commit(next);
   };
 
-  const retry = () => {
+  const retry = async () => {
+    if (!await act({ type: "start", stageId: stage.id, retry: true })) return;
     setClear(null);
     setComplete(false);
-    commit(dropRound(readSave(), stage.id));
     setGlow(null);
     setSelected(new Set());
     setFeedback({ tone: "plain", text: "もう一度！ こんどはヒントなし・まちがいなしをめざそう", key: seq.current++ });
@@ -334,7 +292,7 @@ export function PlayScreen({
                 playSfx("tap", sound);
               }}
               glow={glow}
-              disabled={round.completedAt !== null}
+              disabled={busy || round.completedAt !== null}
               label={`出題漢字「${stage.kanji}」。線をタップすると黒くなります。いま${selected.size}本えらんでいます`}
             />
           </div>
@@ -397,7 +355,7 @@ export function PlayScreen({
             <button type="button" className={styles.secondary} style={{ height: 52, padding: "0 16px" }} onClick={() => setSelected(new Set())} disabled={selected.size === 0}>
               けす
             </button>
-            <button type="button" className={`${styles.primary} ${styles.okButton}`} onClick={() => handleSubmit()} disabled={selected.size === 0 || round.completedAt !== null}>
+            <button type="button" className={`${styles.primary} ${styles.okButton}`} onClick={() => handleSubmit()} disabled={busy || selected.size === 0 || round.completedAt !== null}>
               OK<small>{selected.size > 0 ? `えらんだ線 ${selected.size}本で答える` : "線をタップしてえらぶ"}</small>
             </button>
           </div>
@@ -620,7 +578,7 @@ function HintSheet({
               ) : (
                 <>
                   <span>{hint.description}</span>
-                  <em>{short > 0 ? `墨コインがあと${short}枚たりない` : `墨コイン ${hint.cost}枚`}</em>
+                  <em>{short > 0 ? `青コインがあと${short}枚たりない` : `青コイン ${hint.cost}枚`}</em>
                 </>
               )}
             </button>
@@ -629,7 +587,7 @@ function HintSheet({
       </div>
       <p className={styles.note}>
         ヒントを使った答えは点数が半分、開いた答えは0点になります。線は{stage.strokes.length}本だけなので、ヒントを使わなくても、組み合わせをためせば必ず見つけられます。
-        （出題「{stage.kanji}」・持っている墨コイン {coins}枚）
+        （出題「{stage.kanji}」・持っている青コイン {coins}枚）
       </p>
     </Sheet>
   );
@@ -747,7 +705,7 @@ function ClearDialog({
           <b>{reward.score.toLocaleString("ja-JP")}点</b>
         </div>
         <div className={styles.rewardRow}>
-          <span>墨コイン{reward.firstClear ? "（初クリア）" : ""}</span>
+          <span>青コイン{reward.firstClear ? "（初クリア）" : ""}</span>
           <b>+{reward.coins}枚</b>
         </div>
         <div className={styles.rewardRow}>
