@@ -18,4 +18,4 @@ export const BLUE_OSANPO_MISSION_ALL = 100;
 export const BLUE_OSANPO_COOP = 100;
 
 /** お店のコインの帯に出す、ためかたの短い説明 */
-export const BLUE_COIN_SOURCES_SHORT = "青コインは「おさんぽフレンチー」・はじめての市区町村や都道府県の登録・通算7日ごとのログインでもらえます。";
+export const BLUE_COIN_SOURCES_SHORT = "青コインは「おさんぽフレンチー」・「かくれ漢字」・はじめての市区町村や都道府県の登録・通算7日ごとのログインでもらえます。";

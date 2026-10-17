@@ -182,7 +182,7 @@ test("4. まちがえても点数は減らず、連続ボーナスが切れる�
   assert.equal(round.history[0].text, "2画");
   assert.equal(E.starsFor(kan, { ...round, clearedAt: 3 }), 3, "まちがいで星は減らない");
 });
-test("4. シークレットをはじめて見つけたときだけ墨コイン。全部で実績", () => {
+test("4. シークレットをはじめて見つけたときだけ青コイン。全部で実績", () => {
   let save = P.defaultSave();
   let round = play(E.newRound(kan, 0), MAIN, 1);
   save = P.saveRound(save, round);
@@ -202,7 +202,7 @@ test("4. シークレットをはじめて見つけたときだけ墨コイン�
   assert.ok(save.achievements.first_secret);
   assert.deepEqual(sorted(save.stages[kan.id].secretsFound), sorted(SECRET));
   assert.equal(save.totalPoints, cleared.reward.score + total);
-  assert.equal(P.recordSecret(save, kan, "戈", 100, true, 3).coins, 0, "2回目からは墨コインなし");
+  assert.equal(P.recordSecret(save, kan, "戈", 100, true, 3).coins, 0, "2回目からは青コインなし");
   assert.equal(P.recordSecret(save, kan, "心", 100, true, 3).coins, 0, "シークレットでない字には何もしない");
 });
 
