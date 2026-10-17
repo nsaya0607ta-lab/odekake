@@ -58,7 +58,7 @@ export const STROKE_STRUCTURES: Record<string, StrokeKind[]> = {
   ...furtherStructures as Record<string, StrokeKind[]>,
 };
 
-/** 木が偏になると右払いが点になるなど、辞書で確認できる部品の字形差。点と払いを一律に同一視しない。 */
+/** 部品の字形差と、八の左右に開く短い画の見立て。点と払いを全ての字で同一視しない。 */
 export const STROKE_STRUCTURE_VARIANTS = { ...componentVariants, ...moreComponentVariants, ...furtherComponentVariants } as Record<string, StrokeKind[][]>;
 
 /** 標準の画数（構造データの長さと一致するかをテストで見る） */

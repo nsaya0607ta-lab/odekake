@@ -61,8 +61,8 @@ test("除外により残りの正解が揃ったアカウントは一度だけ�
   const again=applyKanjiAction(paid,first.save.coins,action,now+2);
   assert.equal(again.delta,0);assert.equal(again.save.stages[stage.id].clears,1);assert.deepEqual(again.save.rounds[stage.id].found,round.found);
 });
-test("称の旧全発見から卜を続けて探せる。八の記録は移さず、クリア報酬を二重に渡さない",()=>{
-  const stage=STAGES.find(s=>s.kanji==="称"),oldFound=[...E.mainAnswers(stage).map(a=>a.char),"八","禾"];
+test("称の旧八の発見とヒントを保って卜を続けて探せる。クリア報酬を二重に渡さない",()=>{
+  const stage=STAGES.find(s=>s.kanji==="称"),oldFound=[...E.mainAnswers(stage).map(a=>a.char),"禾"];
   const round={...E.newRound(stage,1),found:oldFound,revealed:["八"],hints:{"八":["reading","reveal"]},score:987,clearedAt:2,rewardedAt:2,completedAt:3};
   const record={clears:1,bestStars:3,bestScore:987,firstClearedAt:2,secretsFound:["禾"]};
   const save={...P.defaultSave(),coins:99999,rounds:{[stage.id]:round},stages:{[stage.id]:record},achievements:{first_correct:1,first_secret:1,all_secrets:1}};
@@ -70,7 +70,7 @@ test("称の旧全発見から卜を続けて探せる。八の記録は移さ�
   const normalized=applyKanjiAction(save,1000,{type:"settings",settings:save.settings},now);
   const resumed=normalized.save.rounds[stage.id];
   assert.equal(normalized.delta,0);assert.equal(resumed.completedAt,null);assert.equal(resumed.clearedAt,2);assert.equal(resumed.rewardedAt,2);assert.equal(resumed.score,987);
-  assert.deepEqual(resumed.found,oldFound.filter(ch=>ch!=="八"));assert.deepEqual(resumed.hints,{});assert.deepEqual(resumed.revealed,[]);
+  assert.deepEqual(resumed.found,oldFound);assert.deepEqual(resumed.hints,{八:["reading","reveal"]});assert.deepEqual(resumed.revealed,["八"]);
   assert.ok(!resumed.found.includes("卜"),"八を見つけた別の組を卜の発見として引き継がない");
   assert.deepEqual(normalized.save.stages[stage.id],record);assert.deepEqual(save,before);
   const started=applyKanjiAction(normalized.save,1000,{type:"start",stageId:stage.id},now+1);
@@ -84,6 +84,28 @@ test("称の旧全発見から卜を続けて探せる。八の記録は移さ�
   const migrated=applyKanjiAction(P.saveRound(P.defaultSave(),unfinished),1000,{type:"settings",settings:save.settings},now);
   assert.equal(migrated.save.rounds[stage.id].rewardedAt,now);assert.ok(migrated.delta>0);
   assert.equal(applyKanjiAction(migrated.save,migrated.save.coins,{type:"settings",settings:save.settings},now+1).delta,0);
+});
+test("八が追加された報酬済みラウンドは得点だけ加算し、クリア数とコインを二重に増やさない",()=>{
+  for(const kanji of ["称","想","謝","村"]){
+    const stage=STAGES.find(s=>s.kanji===kanji),found=stage.answers.map(a=>a.char).filter(ch=>ch!=="八");
+    const record={clears:1,bestStars:3,bestScore:987,firstClearedAt:2,secretsFound:E.secretAnswers(stage).map(a=>a.char)};
+    const save={...P.defaultSave(),coins:99999,totalPoints:987,rounds:{[stage.id]:{...E.newRound(stage,1),found,score:987,clearedAt:2,rewardedAt:2,completedAt:3}},stages:{[stage.id]:record},achievements:{first_correct:1}};
+    const normalized=applyKanjiAction(save,1000,{type:"start",stageId:stage.id},now);
+    const round=normalized.save.rounds[stage.id];assert.equal(round.startedAt,1);assert.equal(round.completedAt,null);assert.equal(round.rewardedAt,2);assert.equal(normalized.delta,0);
+    const out=applyKanjiAction(normalized.save,1000,{type:"submit",stageId:stage.id,strokes:stage.answers.find(a=>a.char==="八").strokeSets[0]},now+1);
+    const points=out.event.outcome.gained.points;
+    assert.equal(out.event.outcome.result.answer.char,"八");assert.equal(out.event.reward,null);assert.equal(out.delta,0);
+    assert.equal(out.save.totalPoints,987+points);assert.equal(out.save.rounds[stage.id].score,987+points);assert.equal(out.save.stages[stage.id].bestScore,987+points);assert.equal(out.save.stages[stage.id].clears,1);
+    assert.notEqual(out.save.rounds[stage.id].completedAt,null);
+    const replay=applyKanjiAction(out.save,1000,{type:"submit",stageId:stage.id,strokes:stage.answers.find(a=>a.char==="八").strokeSets[0]},now+2);
+    assert.equal(replay.delta,0);assert.deepEqual(replay.save,out.save);
+  }
+  const stage=STAGES.find(s=>s.kanji==="称"),found=stage.answers.map(a=>a.char).filter(ch=>!["八","卜"].includes(ch));
+  const record={clears:1,bestStars:3,bestScore:987,firstClearedAt:2,secretsFound:["禾"]};
+  const save={...P.defaultSave(),totalPoints:987,rounds:{[stage.id]:{...E.newRound(stage,1),found,score:987,clearedAt:2,rewardedAt:2,completedAt:3}},stages:{[stage.id]:record},achievements:{first_correct:1,first_secret:1,all_secrets:1}};
+  const secret=applyKanjiAction(save,1000,{type:"submit",stageId:stage.id,strokes:[3,5]},now);
+  assert.equal(secret.save.rounds[stage.id].clearedAt,null,"八をまだ探している");assert.equal(secret.delta,P.SECRET_COINS);
+  assert.equal(secret.save.totalPoints,987+secret.event.outcome.gained.points,"以前のクリア済みラウンドへのシークレット得点も失わない");
 });
 test("ログインはサーバーの日本時間で1日1回。端末の残高を使わない",()=>{
   let out=applyKanjiAction(P.defaultSave(),100,{type:"login"},now);

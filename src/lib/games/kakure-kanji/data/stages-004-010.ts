@@ -206,11 +206,15 @@ const STAGE_DATA: Omit<Stage, "strokes">[] = [
         "strokeSets": [
           [
             7,
+            8
+          ],
+          [
+            7,
             12
           ]
         ],
         "rule": "loose",
-        "evidence": "下の林から、左の木の左払いと、右の木の右払いをえらぶよ。2本は左右にはなれている。",
+        "evidence": "左下の木の左払い7画目と、右下の短い点8画目か、右の木の右払い12画目をえらぶよ。2本が離れて左右に開くので、短い画でも八に見立てる。",
         "tier": 3,
         "meaning": "やっつ",
         "grade": 1,
@@ -220,10 +224,10 @@ const STAGE_DATA: Omit<Stage, "strokes">[] = [
           "ハツ",
           "よう"
         ],
-        "partHint": "下の林から、左の木の左払いと、右の木の右払いをえらぶよ。2本は左右にはなれている。",
+        "partHint": "左下の木の左払い7画目と、右下の短い点8画目か、右の木の右払い12画目をえらぶよ。2本が離れて左右に開くので、短い画でも八に見立てる。",
         "verification": {
           "status": "verified",
-          "note": "日本の筆順・筆画図と対応する画の組を照合。線を動かさず、全画を使ったときの本数・種類・位置関係を確認。"
+          "note": "八の見立て：右の画が短い点でも、2本が接せず左右に開くことと、上下の位置が重なることを原図で確認。"
         }
       },
       {
@@ -305,7 +309,7 @@ const STAGE_DATA: Omit<Stage, "strokes">[] = [
     "verification": {
       "status": "verified",
       "checkedOn": "2026-10-17",
-      "note": "KanjiVGの日本の筆画図・部品構造、KANJIDIC2の字・読み・学年を照合。候補の全一覧と除外理由は docs/kakure-kanji-answers-004-010.md。同じ画の組には実際の字形に合う正解を一字だけ登録する。曰は日へ統合。 2026-10-17再確認：横画より上への突き出しが欠ける大と、その形を前提にする派生字を除外。"
+      "note": "KanjiVGの日本の筆画図・部品構造、KANJIDIC2の字・読み・学年を照合。候補の全一覧と除外理由は docs/kakure-kanji-answers-004-010.md。同じ画の組には実際の字形に合う正解を一字だけ登録する。曰は日へ統合。 2026-10-17再確認：横画より上への突き出しが欠ける大と、その形を前提にする派生字を除外。 八は短い右下の画を含む、離れて左右に開く組を登録。"
     },
     "answerAliases": {
       "入": "人"
@@ -1133,6 +1137,30 @@ const STAGE_DATA: Omit<Stage, "strokes">[] = [
         }
       },
       {
+        "char": "八",
+        "readings": [
+          "ハチ",
+          "やっつ"
+        ],
+        "meaning": "やっつ",
+        "rule": "loose",
+        "strokeSets": [
+          [
+            3,
+            4
+          ]
+        ],
+        "evidence": "左上の木から、左払い3画目と右下の短い点4画目をえらぶよ。2本は接せず左右に開くため、八に見立てる。",
+        "tier": 3,
+        "grade": 1,
+        "rare": false,
+        "partHint": "左上の木から、左払い3画目と右下の短い点4画目をえらぶよ。2本は接せず左右に開くため、八に見立てる。",
+        "verification": {
+          "status": "verified",
+          "note": "八の見立て：右の画が短い点でも、2本が接せず左右に開くことと、上下の位置が重なることを原図で確認。"
+        }
+      },
+      {
         "char": "卜",
         "strokeSets": [
           [
@@ -1169,7 +1197,7 @@ const STAGE_DATA: Omit<Stage, "strokes">[] = [
         "char": "人",
         "reading": "ジン",
         "category": "missing",
-        "reason": "想の木の右下は点で、人に必要な右払いではありません。点と払いは別の種類として扱います。"
+        "reason": "左上の木の右下は短い点で、左払いとは接していません。2本がつながる人にはせず、離れて左右に開く八として見立てます。"
       },
       {
         "char": "旦",
@@ -1193,7 +1221,7 @@ const STAGE_DATA: Omit<Stage, "strokes">[] = [
     "verification": {
       "status": "verified",
       "checkedOn": "2026-10-17",
-      "note": "KanjiVGの日本の筆画図・部品構造、KANJIDIC2の字・読み・学年を照合。候補の全一覧と除外理由は docs/kakure-kanji-answers-004-010.md。同じ画の組には実際の字形に合う正解を一字だけ登録する。曰は日へ統合。"
+      "note": "KanjiVGの日本の筆画図・部品構造、KANJIDIC2の字・読み・学年を照合。候補の全一覧と除外理由は docs/kakure-kanji-answers-004-010.md。同じ画の組には実際の字形に合う正解を一字だけ登録する。曰は日へ統合。 八は短い右下の画を含む、離れて左右に開く組を登録。"
     },
     "answerAliases": {
       "曰": "日"
@@ -2355,6 +2383,30 @@ const STAGE_DATA: Omit<Stage, "strokes">[] = [
           "status": "verified",
           "note": "日本の筆順・筆画図と対応する画の組を照合。線を動かさず、全画を使ったときの本数・種類・位置関係を確認。"
         }
+      },
+      {
+        "char": "八",
+        "readings": [
+          "ハチ",
+          "やっつ"
+        ],
+        "meaning": "やっつ",
+        "rule": "loose",
+        "strokeSets": [
+          [
+            14,
+            17
+          ]
+        ],
+        "evidence": "身の長い左払い14画目と、右の寸の点17画目をえらぶよ。2本が離れて左下と右下へ開くため、長さの違いを見立てた八になる。",
+        "tier": 3,
+        "grade": 1,
+        "rare": false,
+        "partHint": "身の長い左払い14画目と、右の寸の点17画目をえらぶよ。2本が離れて左下と右下へ開くため、長さの違いを見立てた八になる。",
+        "verification": {
+          "status": "verified",
+          "note": "八の見立て：右の画が短い点でも、2本が接せず左右に開くことと、上下の位置が重なることを原図で確認。"
+        }
       }
     ],
     "nearMisses": [
@@ -2398,7 +2450,7 @@ const STAGE_DATA: Omit<Stage, "strokes">[] = [
     "verification": {
       "status": "verified",
       "checkedOn": "2026-10-17",
-      "note": "KanjiVGの日本の筆画図・部品構造、KANJIDIC2の字・読み・学年を照合。候補の全一覧と除外理由は docs/kakure-kanji-answers-004-010.md。同じ画の組には実際の字形に合う正解を一字だけ登録する。曰は日へ統合。"
+      "note": "KanjiVGの日本の筆画図・部品構造、KANJIDIC2の字・読み・学年を照合。候補の全一覧と除外理由は docs/kakure-kanji-answers-004-010.md。同じ画の組には実際の字形に合う正解を一字だけ登録する。曰は日へ統合。 八は短い右下の画を含む、離れて左右に開く組を登録。"
     }
   }
 ];

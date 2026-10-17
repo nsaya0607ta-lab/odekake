@@ -4,7 +4,7 @@ import type { Stage } from "../types";
  * ステージ3「称」。日本の10画の筆順で独自に描いた筆画。
  * 確認資料: https://kakijun.jp/page/10173200.html
  * 7画目は折れない横画。中国簡体字の「尔」の横鉤とは区別する。
- * のぎへんの5画目は短い点。秋・想と同じ基準で、八の右払いには使わない。
+ * のぎへんの5画目は短い点。八は、左右に開いて離れる2画として見立てる。
  */
 export const STAGE_003_SHOU: Stage = {
   id: "s003-shou",
@@ -55,6 +55,13 @@ export const STAGE_003_SHOU: Stage = {
       verification: { status: "verified", note: "横・縦・左払い・点の4画。木が偏で点になる部品字形を照合。" },
     },
     {
+      char: "八", readings: ["ハチ", "や"], meaning: "やっつ", rule: "loose",
+      strokeSets: [[4, 5], [4, 10], [9, 10]], tier: 3, grade: 1,
+      evidence: "のぎへんの左右4・5画目、小の左右9・10画目、または4・10画目をえらぶ。2本が離れて左下と右下へ開くので、右の画が短い点でも八に見立てる。",
+      partHint: "のぎへんの左右か、小の左右の2本をえらぶよ。左右をまたぐ取り方もあるよ",
+      verification: { status: "verified", note: "左下へ向かう画と右下へ向かう画の3組。線を動かさず、2本が接せず左右へ開く八の配置を確認。" },
+    },
+    {
       char: "小", readings: ["ショウ", "ちい"], meaning: "ちいさい", rule: "component",
       strokeSets: [[8, 9, 10]], tier: 1, grade: 1,
       evidence: "右下の8〜10画目がそのまま小になる。中央のまっすぐな縦鉤と、左右のはなれた2画を選ぶ。",
@@ -91,13 +98,12 @@ export const STAGE_003_SHOU: Stage = {
     },
   ],
   nearMisses: [
-    { char: "八", reading: "ハチ（やっつ）", category: "missing", reason: "のぎへんの右下は短い点です。八に必要な右払いがないため、点を払いに変えて正解にはしません。" },
     { char: "二", reading: "ニ（ふたつ）", category: "position", reason: "独立した横画は2本ありますが、左下と右上にはなれていて横の位置が重なりません。線を動かして二にすることはできません。" },
-    { char: "人", reading: "ジン（ひと）", category: "missing", reason: "のぎへんの右下は点で、人に必要な右払いではありません。左払いと点の組を人にはしません。" },
+    { char: "人", reading: "ジン（ひと）", category: "missing", reason: "右下の画は短い点で、左払いとも離れています。2本がつながる人にはせず、離れて左右に開く八として見立てます。" },
     { char: "不", reading: "フ（否定する字）", category: "position", reason: "右下の小の左払いは、上の横画からはなれた位置にあります。不にするには左払いの始まる位置を動かす必要があるため、答えにしません。" },
     { char: "少", reading: "ショウ（すくない）", category: "position", reason: "少では小の下に長い左払いが付きます。称の追加の左払いは上や左にあり、小の下にはないので作れません。" },
     { char: "丿", reading: "の（部首）", category: "radical", reason: "払い1本だけの丿は部首の形なので答えにしません。左の5画を全部えらぶ禾は、単独の漢字なので答えになります。" },
   ],
   reward: { coins: 55, exp: 80, replayCoins: 10, replayExp: 20 },
-  verification: { status: "verified", checkedOn: "2026-10-17", note: "日本の10画の筆順・教科書体と独自描画を照合。5画目を秋・想と同じ点として統一し、八を除外して卜を追加。教育漢字7字とシークレット禾・卜を確認。下だけは小さな縦画のはねを見立て、点と払い・位置の変更は許容しない。" },
+  verification: { status: "verified", checkedOn: "2026-10-17", note: "日本の10画の筆順・教科書体と独自描画を照合。教育漢字8字とシークレット禾・卜。八は短い右下の画も含め、離れて左右に開く3組を認める。卜は別の2画の組として維持。線の移動・切断はしない。" },
 };
