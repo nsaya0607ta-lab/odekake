@@ -187,7 +187,6 @@ export function KakureKanjiGame({ userId }: { userId: string }) {
       )}
 
       </div>
-      {busy && <p className={styles.toast} role="status">青コインと記録を確認中…</p>}
       {error && <div role="alert" className={styles.accountError}><p>{error}</p><button type="button" className={styles.secondary} onClick={retry}>再試行</button></div>}
       {toast && (
         <p key={toast.key} className={styles.toast} role="status">
