@@ -1,0 +1,271 @@
+{
+  "一": {
+    "readings": [
+      "イチ",
+      "ひとつ"
+    ],
+    "meaning": "ひとつ",
+    "grade": 1,
+    "rare": false
+  },
+  "三": {
+    "readings": [
+      "サン",
+      "みっつ"
+    ],
+    "meaning": "みっつ",
+    "grade": 1,
+    "rare": false
+  },
+  "二": {
+    "readings": [
+      "ニ",
+      "ふたつ"
+    ],
+    "meaning": "ふたつ",
+    "grade": 1,
+    "rare": false
+  },
+  "八": {
+    "readings": [
+      "ハチ",
+      "やっつ"
+    ],
+    "meaning": "やっつ",
+    "grade": 1,
+    "rare": false
+  },
+  "十": {
+    "readings": [
+      "ジュウ",
+      "とお"
+    ],
+    "meaning": "とお",
+    "grade": 1,
+    "rare": false
+  },
+  "厂": {
+    "readings": [
+      "カン",
+      "がけ"
+    ],
+    "meaning": "がけ",
+    "grade": null,
+    "rare": true
+  },
+  "又": {
+    "readings": [
+      "ユウ",
+      "また"
+    ],
+    "meaning": "また・ふたたび",
+    "grade": null,
+    "rare": false
+  },
+  "口": {
+    "readings": [
+      "コウ",
+      "くち"
+    ],
+    "meaning": "くち",
+    "grade": 1,
+    "rare": false
+  },
+  "只": {
+    "readings": [
+      "シ",
+      "ただ"
+    ],
+    "meaning": "ただ・それだけ",
+    "grade": null,
+    "rare": true
+  },
+  "各": {
+    "readings": [
+      "カク",
+      "おのおの"
+    ],
+    "meaning": "それぞれ",
+    "grade": 4,
+    "rare": false
+  },
+  "咟": {
+    "readings": [
+      "カク"
+    ],
+    "meaning": "さけぶ",
+    "grade": null,
+    "rare": true
+  },
+  "咱": {
+    "readings": [
+      "サ",
+      "サツ",
+      "われ"
+    ],
+    "meaning": "われ・わたしたち",
+    "grade": null,
+    "rare": true
+  },
+  "唄": {
+    "readings": [
+      "バイ",
+      "うた"
+    ],
+    "meaning": "うた",
+    "grade": null,
+    "rare": false
+  },
+  "土": {
+    "readings": [
+      "ド",
+      "ト",
+      "つち"
+    ],
+    "meaning": "つち",
+    "grade": 1,
+    "rare": false
+  },
+  "圧": {
+    "readings": [
+      "アツ"
+    ],
+    "meaning": "おす・おさえる",
+    "grade": 5,
+    "rare": false
+  },
+  "客": {
+    "readings": [
+      "キャク",
+      "カク"
+    ],
+    "meaning": "たずねてくる人",
+    "grade": 3,
+    "rare": false
+  },
+  "广": {
+    "readings": [
+      "ゲン",
+      "いえ"
+    ],
+    "meaning": "屋根のある建物",
+    "grade": null,
+    "rare": true
+  },
+  "庄": {
+    "readings": [
+      "ショウ"
+    ],
+    "meaning": "いなか・土地",
+    "grade": null,
+    "rare": true
+  },
+  "日": {
+    "readings": [
+      "ニチ",
+      "ひ"
+    ],
+    "meaning": "ひ・たいよう",
+    "grade": 1,
+    "rare": false
+  },
+  "牛": {
+    "readings": [
+      "ギュウ",
+      "うし"
+    ],
+    "meaning": "うし",
+    "grade": 2,
+    "rare": false
+  },
+  "生": {
+    "readings": [
+      "セイ",
+      "ショウ",
+      "いきる"
+    ],
+    "meaning": "いきる・うまれる",
+    "grade": 1,
+    "rare": false
+  },
+  "産": {
+    "readings": [
+      "サン",
+      "うむ"
+    ],
+    "meaning": "うむ・うまれる",
+    "grade": 4,
+    "rare": false
+  },
+  "白": {
+    "readings": [
+      "ハク",
+      "しろ"
+    ],
+    "meaning": "しろ",
+    "grade": 1,
+    "rare": false
+  },
+  "百": {
+    "readings": [
+      "ヒャク"
+    ],
+    "meaning": "ひゃく",
+    "grade": 1,
+    "rare": false
+  },
+  "目": {
+    "readings": [
+      "モク",
+      "め"
+    ],
+    "meaning": "め",
+    "grade": 1,
+    "rare": false
+  },
+  "立": {
+    "readings": [
+      "リツ",
+      "たつ"
+    ],
+    "meaning": "たつ",
+    "grade": 1,
+    "rare": false
+  },
+  "自": {
+    "readings": [
+      "ジ",
+      "みずから"
+    ],
+    "meaning": "みずから",
+    "grade": 2,
+    "rare": false
+  },
+  "貝": {
+    "readings": [
+      "バイ",
+      "かい"
+    ],
+    "meaning": "かい",
+    "grade": 1,
+    "rare": false
+  },
+  "頁": {
+    "readings": [
+      "ケツ",
+      "ページ"
+    ],
+    "meaning": "ページ・かしら",
+    "grade": null,
+    "rare": true
+  },
+  "額": {
+    "readings": [
+      "ガク",
+      "ひたい"
+    ],
+    "meaning": "ひたい・金銭の量",
+    "grade": 5,
+    "rare": false
+  }
+}
