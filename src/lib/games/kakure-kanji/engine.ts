@@ -1,5 +1,5 @@
 import type { Answer, Stage } from "./types";
-import { equivalentAnswers, judgeStrokes, normalizeSelection, verifiedAnswers, type JudgeResult } from "./judge";
+import { judgeStrokes, normalizeSelection, verifiedAnswers, type JudgeResult } from "./judge";
 
 /**
  * 1回のプレイ（ラウンド）の状態と、点数・ヒントの決まり。どれも純粋な関数で、画面から切りはなしてテストできる。
@@ -104,11 +104,16 @@ function markProgress(stage: Stage, round: RoundState, now: number): RoundState 
   return next;
 }
 
-/** 正解の統合を保存済みラウンドにも適用する。獲得済みの点数・報酬はそのまま。 */
+/** 旧セーブの字を現在の正解へ対応づける。判定は字形に合わせた strokeSets だけで行う。 */
+export function canonicalAnswerChar(stage: Stage, char: string): string {
+  return stage.answerAliases?.[char] ?? char;
+}
+
+/** 正解の変更を保存済みラウンドにも適用する。獲得済みの点数・報酬はそのまま。 */
 export function reconcileRound(stage: Stage, round: RoundState, now: number): RoundState {
   const chars = new Set(verifiedAnswers(stage).map((answer) => answer.char));
-  const canonical = (char: string) => char === "曰" && chars.has("日") ? "日" : char;
-  const expand = (list: string[]) => equivalentAnswers(stage, list.map(canonical)).map((answer) => answer.char);
+  const canonical = (char: string) => canonicalAnswerChar(stage, char);
+  const normalize = (list: string[]) => [...new Set(list.map(canonical))].filter((char) => chars.has(char));
   const hints: RoundState["hints"] = {};
   for (const [char, used] of Object.entries(round.hints)) {
     const target = canonical(char);
@@ -116,10 +121,14 @@ export function reconcileRound(stage: Stage, round: RoundState, now: number): Ro
   }
   return markProgress(stage, {
     ...round,
-    found: expand(round.found),
-    revealed: expand(round.revealed),
+    found: normalize(round.found),
+    revealed: normalize(round.revealed),
     hints,
-    history: round.history.map((record) => ({ ...record, text: record.text.replaceAll("曰", "日") })),
+    history: round.history.flatMap((record) => {
+      if (record.kind !== "correct" && record.kind !== "duplicate") return [record];
+      const text = normalize(record.text.split("・")).join("・");
+      return text ? [{ ...record, text }] : [];
+    }),
   }, now);
 }
 
@@ -196,12 +205,11 @@ export function canUseHint(round: RoundState, answerChar: string, kind: HintKind
 
 /** ヒントを使った状態にする。コインの支払いは progress.ts の spendCoins で先に行う */
 export function applyHint(stage: Stage, round: RoundState, answerChar: string, kind: HintKind, now: number): RoundState {
-  if (!canUseHint(round, answerChar, kind)) return round;
+  if (!verifiedAnswers(stage).some((answer) => answer.char === answerChar) || !canUseHint(round, answerChar, kind)) return round;
   const hints = { ...round.hints, [answerChar]: [...(round.hints[answerChar] ?? []), kind] };
   if (kind !== "reveal") return { ...round, hints };
-  const group = equivalentAnswers(stage, [answerChar]).map((answer) => answer.char);
-  const found = [...new Set([...round.found, ...group])];
-  return markProgress(stage, { ...round, hints, found, revealed: [...new Set([...round.revealed, ...group])], combo: 0 }, now);
+  const found = [...round.found, answerChar];
+  return markProgress(stage, { ...round, hints, found, revealed: [...round.revealed, answerChar], combo: 0 }, now);
 }
 
 /** ヒントを使った回数。stage をわたすと、見つける字（シークレットでない字）に使った分だけを数える */

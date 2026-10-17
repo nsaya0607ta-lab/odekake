@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { Stage } from "./types";
-import { hintCount, isSecret, reconcileRound, secretAnswers, starsFor, type HintKind, type RoundState } from "./engine";
+import { canonicalAnswerChar, hintCount, isSecret, reconcileRound, secretAnswers, starsFor, type HintKind, type RoundState } from "./engine";
 
 /**
  * 進みぐあい（セーブデータ）と、コイン・経験値・レベル・実績・称号の決まり。
@@ -91,6 +91,7 @@ export function parseSave(value: unknown): SaveData | null {
 
 /** 正解データの変更を引き継ぎ、統合でクリアしたラウンドには通常の報酬を一度だけ渡す。 */
 export function reconcileSave(save: SaveData, stages: Stage[], now: number): SaveData {
+  const byId = new Map(stages.map((stage) => [stage.id, stage]));
   let next: SaveData = { ...save, rounds: { ...save.rounds }, stages: { ...save.stages } };
   for (const stage of stages) {
     const record = next.stages[stage.id];
@@ -106,7 +107,10 @@ export function reconcileSave(save: SaveData, stages: Stage[], now: number): Sav
   }
   return {
     ...next,
-    hintLog: next.hintLog.map((record) => ({ ...record, answer: record.answer === "曰" ? "日" : record.answer })),
+    hintLog: next.hintLog.map((record) => {
+      const stage = byId.get(record.stageId);
+      return stage ? { ...record, answer: canonicalAnswerChar(stage, record.answer) } : record;
+    }),
   };
 }
 
