@@ -220,7 +220,7 @@ export const STAGE_001_KAN: Stage = {
     { char: "丿", reading: "の（部首）", category: "radical", reason: "払い1本だけの「丿」は部首の形で、このゲームでは答えにしません。" },
     { char: "代", reading: "ダイ（かわる）", category: "position", reason: "代は左に「亻（にんべん）」が必要です。感の左側には、ノと縦画が並んだ亻の形はありません（右側の「弋」なら取り出せます）。" },
     { char: "日", reading: "ニチ（ひ）", category: "position", reason: "日は四角の中に横画が入った形。感の「口」の中には画がなく、近くの横画（3画目）は口の外の上にあります。" },
-    { char: "小", reading: "ショウ（ちいさい）", category: "missing", reason: "小には「亅（まっすぐのたてのはね）」が必要です。心の底の画（11画目）は右へまがるので、見立てでも亅にはなりません。" },
+    { char: "小", reading: "ショウ（ちいさい）", category: "position", reason: "小は中央のまっすぐな縦画と、その左右の画が必要です。感の縦画は口の左にあり、小の位置関係にはなりません。心の底の画（11画目）は右へまがるので、はねの有無を問わない見立てでも、まっすぐな縦画にはできません。" },
   ],
   reward: { coins: 40, exp: 60, replayCoins: 8, replayExp: 15 },
   verification: {

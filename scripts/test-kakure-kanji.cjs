@@ -520,4 +520,81 @@ test("10. どの結果にも画面に出す文があり、undefined が出ない
   }
 });
 
+// ---------- 11. 追加ステージ「漢」「称」 ----------
+const additions = [
+  { char: "漢", main: ["一", "二", "三", "十", "口", "人", "大", "夫"], secret: ["汁"] },
+  { char: "称", main: ["一", "十", "千", "木", "八", "小", "丁", "下"], secret: ["禾"] },
+];
+
+for (const { char, main, secret } of additions) {
+  const stage = STAGES.find((s) => s.kanji === char);
+  assert.ok(stage, `ステージ「${char}」が公開一覧にある`);
+  test(`11. 「${char}」の通常8字とシークレット1字、全筆画の組で判定が一致する`, () => {
+    assert.deepEqual(sorted(E.mainAnswers(stage).map((a) => a.char)), sorted(main));
+    assert.deepEqual(sorted(E.secretAnswers(stage).map((a) => a.char)), sorted(secret));
+    const registered = new Map(stage.answers.flatMap((a) => a.strokeSets.map((ids) => [sorted(ids).join(","), a.char])));
+    const found = new Set();
+    for (let mask = 1; mask < 1 << stage.strokes.length; mask++) {
+      const ids = stage.strokes.filter((_, i) => mask & (1 << i)).map((s) => s.id);
+      const result = J.judgeStrokes(stage, ids, found);
+      const expected = registered.get(sorted(ids).join(","));
+      if (expected) {
+        assert.equal(result.kind, "correct", `${char} [${ids}]`);
+        assert.equal(result.answer.char, expected);
+      } else {
+        assert.notEqual(result.kind, "correct", `${char} の未登録の組 [${ids}]`);
+      }
+    }
+  });
+  test(`11. 「${char}」は通常の答えでクリアし、保存してからシークレットまで完成できる`, () => {
+    let round = E.newRound(stage, 1);
+    for (const answer of main) {
+      const a = stage.answers.find((candidate) => candidate.char === answer);
+      round = E.submit(stage, round, a.strokeSets[0], 2).round;
+    }
+    assert.equal(round.clearedAt, 2);
+    assert.equal(round.completedAt, null);
+    let save = P.saveRound(P.defaultSave(), round);
+    save = P.completeStage(save, stage, round, 3).save;
+    const storage = memoryStorage();
+    const store = P.createKeyValueStore(storage);
+    store.save(save);
+    save = store.load();
+    assert.deepEqual(save.rounds[stage.id].found, main);
+    for (const answer of secret) {
+      const a = stage.answers.find((candidate) => candidate.char === answer);
+      round = E.submit(stage, save.rounds[stage.id], a.strokeSets[0], 4).round;
+      save = P.saveRound(save, round);
+    }
+    assert.equal(round.completedAt, 4);
+    assert.equal(E.starsFor(stage, round), 3);
+  });
+}
+
+test("11. 「漢」の横画は二が6通り・三が4通りで、天とは区別する", () => {
+  const stage = STAGES.find((s) => s.kanji === "漢");
+  assert.equal(stage.answers.find((a) => a.char === "二").strokeSets.length, 6);
+  assert.equal(stage.answers.find((a) => a.char === "三").strokeSets.length, 4);
+  assert.equal(J.judgeStrokes(stage, [10, 11, 12, 13], new Set()).answer.char, "夫");
+  assert.equal(J.judgeStrokes(stage, [12, 13], new Set()).answer.char, "人");
+  assert.ok(!stage.answers.some((a) => ["天", "中", "八", "氵", "艹"].includes(a.char)));
+});
+
+test("11. 「称」は日本の7画目が横画。丁・下・小と、はなれた八を区別する", () => {
+  const stage = STAGES.find((s) => s.kanji === "称");
+  const answer = (ids) => J.judgeStrokes(stage, ids, new Set()).answer.char;
+  assert.equal(stage.strokes[6].kind, "横");
+  assert.equal(answer([7]), "一");
+  assert.equal(answer([7, 8]), "丁");
+  assert.equal(answer([7, 8, 10]), "下");
+  assert.equal(answer([8, 9, 10]), "小");
+  assert.equal(answer([4, 5]), "八");
+  // 左払いのすべての制御点が x <= 29、右払いは x >= 34。線の太さを含めても接しない。
+  const xs = (id) => stage.strokes.find((s) => s.id === id).d.match(/-?\d+(\.\d+)?/g).map(Number).filter((_, i) => i % 2 === 0);
+  const left = stage.strokes[3];
+  const right = stage.strokes[4];
+  assert.ok(Math.max(...xs(4)) + left.width / 2 < Math.min(...xs(5)) - right.width / 2);
+  assert.ok(!stage.answers.some((a) => ["二", "人", "少", "不"].includes(a.char)));
+});
+
 console.log(`\n${passed} tests passed`);
