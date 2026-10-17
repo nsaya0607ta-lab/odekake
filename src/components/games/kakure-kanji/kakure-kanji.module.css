@@ -1,0 +1,1209 @@
+/* かくれ漢字。和紙の地・墨の字・朱のアクセント。動きは transform / opacity だけにして、低性能な端末でも 60fps を保つ。 */
+
+.root {
+  --paper: #f5eedf;
+  --paper-2: #ece2cc;
+  --card: #fffaf0;
+  --card-edge: #e3d6bb;
+  --ink: #2b2620;
+  --ink-soft: #6b6155;
+  --ink-faint: #a0947f;
+  --shu: #c4523a; /* 朱 */
+  --shu-soft: #f6dcd2;
+  --kin: #c08d22; /* 金 */
+  --kin-soft: #f7e9c4;
+  --ai: #2f5470; /* 藍 */
+  --ai-soft: #dce7ef;
+  --matsu: #4f7d52; /* 松葉 */
+  --guide: rgba(196, 82, 58, 0.22);
+  --shadow: 0 10px 26px rgba(92, 66, 30, 0.14), 0 2px 0 rgba(255, 255, 255, 0.7) inset;
+  --tile-shadow: 0 3px 0 #ddcfb2, 0 6px 14px rgba(92, 66, 30, 0.1);
+  --veil: rgba(43, 38, 32, 0.42);
+  --sheen: rgba(255, 255, 255, 0.75);
+  --stroke-off: #cbc1b0;
+  color-scheme: light;
+
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  height: var(--kk-vh, 100dvh);
+  overflow: hidden;
+  color: var(--ink);
+  background-color: var(--paper);
+  /* 和紙：うすい繊維（SVG のノイズ）と、ゆるい光のむら */
+  background-image:
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 .45 0 0 0 0 .36 0 0 0 0 .22 0 0 0 .07 0'/></filter><rect width='160' height='160' filter='url(%23n)'/></svg>"),
+    radial-gradient(120% 60% at 50% 0%, var(--sheen), transparent 60%),
+    linear-gradient(180deg, var(--paper), var(--paper-2));
+  font-family: "Hiragino Maru Gothic ProN", "Hiragino Sans", "Yu Gothic Medium", "Noto Sans JP", system-ui, sans-serif;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.root[data-theme="dark"] {
+  --paper: #1c1915;
+  --paper-2: #14120f;
+  --card: #29241e;
+  --card-edge: #3d352b;
+  --ink: #f1e8d8;
+  --ink-soft: #c2b5a0;
+  --ink-faint: #8a7f6e;
+  --shu: #ec8466;
+  --shu-soft: #4a2b22;
+  --kin: #e2b54f;
+  --kin-soft: #3f331b;
+  --ai: #8fb7d6;
+  --ai-soft: #22313d;
+  --matsu: #8cc08e;
+  --guide: rgba(236, 132, 102, 0.2);
+  --shadow: 0 10px 26px rgba(0, 0, 0, 0.45), 0 1px 0 rgba(255, 255, 255, 0.05) inset;
+  --tile-shadow: 0 3px 0 #15120e, 0 6px 14px rgba(0, 0, 0, 0.35);
+  --veil: rgba(0, 0, 0, 0.6);
+  --sheen: rgba(255, 240, 210, 0.05);
+  --stroke-off: #4f473d;
+  color-scheme: dark;
+}
+
+.root button {
+  font: inherit;
+  color: inherit;
+  touch-action: manipulation;
+}
+
+.root :focus-visible {
+  outline: 3px solid var(--ai);
+  outline-offset: 2px;
+}
+
+.mincho {
+  font-family: var(--font-kk-mincho), "Klee One", "Hiragino Mincho ProN", "Yu Mincho", "YuMincho", "Noto Serif JP", "BIZ UDMincho", serif;
+}
+
+/* ---------- 上の帯 ---------- */
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: calc(env(safe-area-inset-top) + 8px) 12px 8px;
+  flex-shrink: 0;
+}
+
+.iconButton {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  border-radius: 999px;
+  border: 1px solid var(--card-edge);
+  background: var(--card);
+  box-shadow: var(--tile-shadow);
+  font-size: 18px;
+  font-weight: 900;
+  transition: transform 0.12s ease;
+}
+.iconButton:active {
+  transform: translateY(2px) scale(0.96);
+}
+
+.stageMeta {
+  min-width: 0;
+  flex: 1;
+  line-height: 1.15;
+}
+.stageMeta small {
+  display: block;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  color: var(--shu);
+}
+.stageMeta strong {
+  display: block;
+  font-size: 15px;
+  font-weight: 900;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 32px;
+  padding: 0 10px;
+  border-radius: 999px;
+  border: 1px solid var(--card-edge);
+  background: var(--card);
+  font-size: 13px;
+  font-weight: 900;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.coinDot {
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  background: radial-gradient(circle at 35% 30%, #6d6459, #1f1b16 70%);
+  box-shadow: 0 0 0 1.5px var(--kin);
+}
+.scorePop {
+  position: absolute;
+  right: 0;
+  top: 100%;
+  color: var(--shu);
+  font-weight: 900;
+  font-size: 15px;
+  pointer-events: none;
+  animation: rise 0.9s cubic-bezier(0.2, 0.7, 0.3, 1) forwards;
+}
+@keyframes rise {
+  0% { opacity: 0; transform: translateY(6px) scale(0.8); }
+  20% { opacity: 1; transform: translateY(0) scale(1.1); }
+  100% { opacity: 0; transform: translateY(-22px) scale(1); }
+}
+
+/* ---------- 中央 ---------- */
+.scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 2px 14px 12px;
+}
+.column {
+  width: 100%;
+  max-width: 460px;
+  margin: 0 auto;
+}
+
+.board {
+  position: relative;
+  width: min(84vw, 44vh, 380px);
+  aspect-ratio: 1;
+  margin: 4px auto 0;
+  border-radius: 22px;
+  background: var(--card);
+  border: 1px solid var(--card-edge);
+  box-shadow: var(--shadow);
+  padding: 7%;
+}
+.board::after {
+  /* 和紙のふち */
+  content: "";
+  position: absolute;
+  inset: 6px;
+  border-radius: 17px;
+  border: 1px dashed var(--card-edge);
+  pointer-events: none;
+}
+.board[data-pulse="true"] {
+  animation: boardPulse 0.6s ease-out;
+}
+@keyframes boardPulse {
+  0% { transform: scale(1); }
+  35% { transform: scale(1.035); }
+  100% { transform: scale(1); }
+}
+
+/* ---------- 線をえらぶ盤 ---------- */
+.board[data-shake="true"] {
+  animation: shake 0.36s cubic-bezier(0.36, 0.07, 0.19, 0.97);
+}
+.boardInner {
+  width: 100%;
+  height: 100%;
+}
+.strokeBoard {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  touch-action: none; /* 線をなぞるときに画面がスクロールしないように */
+  cursor: pointer;
+}
+.strokeBoard[data-disabled="true"] {
+  cursor: default;
+}
+.strokeBoard [data-part="guides"] rect {
+  fill: none;
+  stroke: var(--guide);
+  stroke-width: 0.6;
+}
+.strokeBoard [data-part="guides"] line {
+  stroke: var(--guide);
+  stroke-width: 0.5;
+  stroke-dasharray: 2 2;
+}
+.strokeBoard [data-part="ink"] path {
+  stroke: var(--stroke-off);
+  transition: stroke 0.12s ease;
+}
+.strokeBoard [data-part="ink"] path[data-on="true"] {
+  stroke: var(--ink);
+}
+.strokeBoard [data-part="glow"] path {
+  stroke: var(--kin);
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  filter: drop-shadow(0 0 2.4px var(--kin));
+  animation: drawGlow 1.3s cubic-bezier(0.3, 0.7, 0.3, 1) forwards;
+  pointer-events: none;
+}
+.okButton {
+  flex: 1;
+  height: 52px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  line-height: 1.05;
+  font-size: 20px !important;
+}
+.okButton small {
+  font-size: 10.5px;
+  font-weight: 800;
+  opacity: 0.9;
+}
+
+.kanjiSvg {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.kanjiSvg [data-part="guides"] rect {
+  fill: none;
+  stroke: var(--guide);
+  stroke-width: 0.6;
+}
+.kanjiSvg [data-part="guides"] line {
+  stroke: var(--guide);
+  stroke-width: 0.5;
+  stroke-dasharray: 2 2;
+}
+.kanjiSvg [data-part="ink"] path {
+  stroke: var(--ink);
+  transition: stroke 0.25s ease, opacity 0.25s ease;
+}
+.kanjiSvg[data-mode="focus"] [data-part="ink"] path {
+  opacity: 0.16;
+}
+.kanjiSvg[data-mode="focus"] [data-part="ink"] path[data-lit="true"] {
+  opacity: 1;
+  stroke: var(--shu);
+}
+.kanjiSvg [data-part="glow"] path {
+  stroke: var(--kin);
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  filter: drop-shadow(0 0 2.4px var(--kin));
+  animation: drawGlow 1.3s cubic-bezier(0.3, 0.7, 0.3, 1) forwards;
+}
+@keyframes drawGlow {
+  0% { stroke-dashoffset: 1; opacity: 1; }
+  45% { stroke-dashoffset: 0; opacity: 1; }
+  100% { stroke-dashoffset: 0; opacity: 0; }
+}
+
+.counter {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 10px;
+  font-size: 13px;
+  font-weight: 900;
+  color: var(--ink-soft);
+}
+.counter b {
+  font-size: 20px;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+.progressTrack {
+  width: 88px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--paper-2);
+  overflow: hidden;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.12);
+}
+.progressFill {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--kin), var(--shu));
+  transform-origin: left;
+  transition: transform 0.5s cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+
+.slots {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 7px;
+  margin-top: 10px;
+}
+.slot {
+  position: relative;
+  aspect-ratio: 1;
+  border-radius: 14px;
+  border: 1px solid var(--card-edge);
+  background: var(--card);
+  box-shadow: var(--tile-shadow);
+  display: grid;
+  place-items: center;
+  font-size: clamp(22px, 7.4vw, 32px);
+  font-weight: 700;
+  transition: transform 0.12s ease;
+}
+.slot:active {
+  transform: translateY(2px);
+}
+.slot[data-found="false"] {
+  background: repeating-linear-gradient(135deg, transparent 0 6px, rgba(160, 148, 127, 0.07) 6px 12px), var(--card);
+  color: var(--ink-faint);
+  font-size: 18px;
+}
+.slot[data-found="true"][data-revealed="true"] {
+  color: var(--ink-soft);
+}
+.slot[data-pop="true"] {
+  animation: slotPop 0.55s cubic-bezier(0.2, 1.4, 0.4, 1);
+}
+@keyframes slotPop {
+  0% { transform: scale(0.6); }
+  60% { transform: scale(1.12); }
+  100% { transform: scale(1); }
+}
+.slotTier {
+  position: absolute;
+  bottom: 4px;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: center;
+  gap: 2px;
+}
+.slotTier i {
+  width: 4px;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--kin);
+}
+.slotNote {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  right: 3px;
+  font-size: 8px;
+  font-weight: 900;
+  line-height: 1.1;
+  color: var(--ai);
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.slotRare {
+  position: absolute;
+  top: -5px;
+  right: -4px;
+  padding: 1px 4px;
+  border-radius: 6px;
+  background: var(--ai);
+  color: var(--card);
+  font-size: 8px;
+  font-weight: 900;
+}
+
+.slot[data-secret="true"] {
+  border-style: dashed;
+  border-color: color-mix(in srgb, var(--ai) 45%, var(--card-edge));
+}
+.slot[data-secret="true"][data-found="false"] {
+  font-size: 16px;
+  background: repeating-linear-gradient(135deg, transparent 0 6px, color-mix(in srgb, var(--ai) 8%, transparent) 6px 12px), var(--card);
+}
+.slot[data-secret="true"][data-found="true"] {
+  color: var(--ai);
+  background: color-mix(in srgb, var(--ai) 9%, var(--card));
+}
+.mainSlots {
+  gap: 6px;
+}
+.mainSlots .slot {
+  font-size: clamp(22px, 7.6vw, 38px);
+  border-radius: 12px;
+}
+.mainSlots .slot[data-found="false"] {
+  font-size: 18px;
+}
+.slotGrade {
+  position: absolute;
+  top: -5px;
+  right: -4px;
+  padding: 1px 4px;
+  border-radius: 6px;
+  background: var(--matsu);
+  color: var(--card);
+  font-size: 8px;
+  font-weight: 900;
+  font-family: system-ui, sans-serif;
+}
+.clearBadge {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--shu);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 900;
+}
+.secretBox {
+  margin-top: 12px;
+  padding: 10px 10px 12px;
+  border-radius: 18px;
+  border: 1px dashed color-mix(in srgb, var(--ai) 45%, var(--card-edge));
+  background: color-mix(in srgb, var(--ai-soft) 45%, transparent);
+}
+.secretBox .slots {
+  margin-top: 8px;
+  gap: 5px;
+}
+.secretBox .slot {
+  font-size: clamp(16px, 5.4vw, 24px);
+  border-radius: 12px;
+}
+.secretHead {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 900;
+  color: var(--ai);
+}
+.secretHead small {
+  flex: 1;
+  font-size: 10px;
+  font-weight: 800;
+  color: var(--ink-faint);
+}
+.secretHead b {
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+}
+.secretNote {
+  margin-top: 8px;
+  font-size: 10.5px;
+  font-weight: 800;
+  color: var(--ink-faint);
+}
+
+.feedback {
+  min-height: 40px;
+  margin-top: 10px;
+  padding: 8px 12px;
+  border-radius: 14px;
+  font-size: 12.5px;
+  font-weight: 800;
+  line-height: 1.45;
+  background: color-mix(in srgb, var(--card) 70%, transparent);
+  border: 1px solid transparent;
+  color: var(--ink-soft);
+}
+.feedback[data-tone="good"] {
+  border-color: color-mix(in srgb, var(--matsu) 35%, transparent);
+  color: var(--matsu);
+}
+.feedback[data-tone="bad"] {
+  border-color: color-mix(in srgb, var(--shu) 30%, transparent);
+  color: var(--ink);
+}
+.feedback[data-tone="info"] {
+  border-color: color-mix(in srgb, var(--ai) 30%, transparent);
+  color: var(--ai);
+}
+.history {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding-bottom: 2px;
+}
+.history::-webkit-scrollbar {
+  display: none;
+}
+.chip {
+  flex-shrink: 0;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 800;
+  border: 1px solid var(--card-edge);
+  background: var(--card);
+}
+.chip[data-kind="correct"] {
+  border-color: var(--matsu);
+  color: var(--matsu);
+}
+.chip[data-kind="nearMiss"],
+.chip[data-kind="unknown"] {
+  color: var(--ink-faint);
+  text-decoration: line-through;
+  text-decoration-color: var(--shu);
+}
+
+/* ---------- 下の入力 ---------- */
+.dock {
+  flex-shrink: 0;
+  padding: 10px 12px calc(env(safe-area-inset-bottom) + 10px);
+  background: color-mix(in srgb, var(--card) 88%, transparent);
+  border-top: 1px solid var(--card-edge);
+  box-shadow: 0 -8px 22px rgba(60, 40, 10, 0.07);
+}
+.inputRow {
+  display: flex;
+  gap: 8px;
+}
+@keyframes shake {
+  20% { transform: translateX(-5px); }
+  40% { transform: translateX(5px); }
+  60% { transform: translateX(-3px); }
+  80% { transform: translateX(2px); }
+}
+
+.primary {
+  height: 50px;
+  padding: 0 18px;
+  flex-shrink: 0;
+  border-radius: 14px;
+  border: 0;
+  background: linear-gradient(180deg, #d4664c, var(--shu));
+  color: #fff !important;
+  font-size: 16px;
+  font-weight: 900;
+  box-shadow: 0 4px 0 #8f3524, 0 8px 16px rgba(196, 82, 58, 0.28);
+  transition: transform 0.1s ease, box-shadow 0.1s ease;
+}
+.primary:active {
+  transform: translateY(3px);
+  box-shadow: 0 1px 0 #8f3524, 0 3px 8px rgba(196, 82, 58, 0.25);
+}
+.primary:disabled {
+  opacity: 0.5;
+}
+
+.actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 8px;
+}
+.secondary {
+  height: 44px;
+  border-radius: 13px;
+  border: 1px solid var(--card-edge);
+  background: var(--card);
+  box-shadow: var(--tile-shadow);
+  font-size: 14px;
+  font-weight: 900;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: transform 0.1s ease;
+}
+.secondary:active {
+  transform: translateY(2px);
+}
+.secondary small {
+  font-size: 11px;
+  color: var(--ink-faint);
+}
+
+/* ---------- 正解の字が一覧へとぶ ---------- */
+.flyer {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 70;
+  display: grid;
+  place-items: center;
+  border-radius: 14px;
+  color: var(--shu);
+  font-weight: 700;
+  pointer-events: none;
+  will-change: transform, opacity;
+  text-shadow: 0 0 18px color-mix(in srgb, var(--kin) 80%, transparent);
+}
+
+/* ---------- 下から出るシート・まんなかのダイアログ ---------- */
+.veil {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  background: var(--veil);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  animation: fadeIn 0.18s ease-out;
+}
+.veil[data-center="true"] {
+  align-items: center;
+  padding: 16px;
+}
+@keyframes fadeIn {
+  from { opacity: 0; }
+}
+.sheet {
+  position: relative;
+  width: 100%;
+  max-width: 480px;
+  max-height: min(86%, 720px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 18px 16px calc(env(safe-area-inset-bottom) + 18px);
+  border-radius: 24px 24px 0 0;
+  background: var(--card);
+  color: var(--ink);
+  box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.2);
+  animation: sheetUp 0.26s cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+.veil[data-center="true"] .sheet {
+  border-radius: 24px;
+  max-height: 92%;
+  padding-bottom: 18px;
+  animation: popIn 0.32s cubic-bezier(0.2, 1.2, 0.4, 1);
+}
+@keyframes sheetUp {
+  from { transform: translateY(40px); opacity: 0; }
+}
+@keyframes popIn {
+  from { transform: scale(0.88); opacity: 0; }
+}
+.sheetHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.sheetHead h2 {
+  font-size: 18px;
+  font-weight: 900;
+}
+.close {
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  border: 1px solid var(--card-edge);
+  background: var(--paper);
+  font-size: 16px;
+  font-weight: 900;
+}
+
+.hintGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.hintButton {
+  min-height: 64px;
+  padding: 8px 10px;
+  border-radius: 14px;
+  border: 1px solid var(--card-edge);
+  background: var(--paper);
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.hintButton b {
+  font-size: 14px;
+  font-weight: 900;
+}
+.hintButton span {
+  font-size: 11px;
+  color: var(--ink-soft);
+  font-weight: 700;
+}
+.hintButton em {
+  font-style: normal;
+  font-size: 12px;
+  font-weight: 900;
+  color: var(--kin);
+}
+.hintButton:disabled {
+  opacity: 0.5;
+}
+.hintButton[data-used="true"] {
+  border-color: var(--ai);
+  background: var(--ai-soft);
+  opacity: 1;
+}
+.hintReveal {
+  margin-top: 4px;
+  font-size: 16px;
+  font-weight: 900;
+  color: var(--ai);
+}
+.partArt {
+  flex-shrink: 0;
+  width: 54px;
+  height: 54px;
+  padding: 4px;
+  border-radius: 10px;
+  background: var(--card);
+  border: 1px solid var(--card-edge);
+}
+
+.targetPicker {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 12px;
+  padding: 8px 10px;
+  border-radius: 14px;
+  background: var(--paper);
+}
+.targetPicker strong {
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.explain {
+  display: grid;
+  grid-template-columns: 96px 1fr;
+  gap: 12px;
+  align-items: start;
+  padding: 12px 0;
+  border-top: 1px solid var(--card-edge);
+}
+.explain:first-of-type {
+  border-top: 0;
+}
+.explainArt {
+  position: relative;
+  width: 96px;
+  height: 96px;
+  border-radius: 14px;
+  background: var(--paper);
+  border: 1px solid var(--card-edge);
+  padding: 9px;
+}
+.explainChar {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.explainChar strong {
+  font-size: 30px;
+  line-height: 1;
+}
+.explainChar span {
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--ink-soft);
+}
+.tag {
+  display: inline-block;
+  margin-top: 4px;
+  margin-right: 4px;
+  padding: 1px 7px;
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 900;
+  background: var(--shu-soft);
+  color: var(--shu);
+}
+.tag[data-kind="rare"] {
+  background: var(--ai-soft);
+  color: var(--ai);
+}
+.explainText {
+  margin-top: 6px;
+  font-size: 12.5px;
+  line-height: 1.6;
+  font-weight: 700;
+  color: var(--ink-soft);
+}
+
+/* ---------- ホーム・一覧 ---------- */
+.home {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 4px 16px calc(env(safe-area-inset-bottom) + 20px);
+}
+.hero {
+  position: relative;
+  margin-top: 6px;
+  padding: 22px 18px 18px;
+  border-radius: 28px;
+  background: var(--card);
+  border: 1px solid var(--card-edge);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+  text-align: center;
+}
+.heroSeal {
+  position: absolute;
+  right: 16px;
+  top: 16px;
+  width: 44px;
+  height: 44px;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  background: var(--shu);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 900;
+  line-height: 1;
+  transform: rotate(6deg);
+  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.15);
+}
+.logo {
+  font-size: 40px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+}
+.logoSub {
+  margin-top: 4px;
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--ink-soft);
+}
+.heroBoard {
+  width: 150px;
+  height: 150px;
+  margin: 14px auto 6px;
+  padding: 12px;
+  border-radius: 18px;
+  background: var(--paper);
+  border: 1px solid var(--card-edge);
+}
+
+.profile {
+  margin-top: 14px;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 12px;
+  align-items: center;
+  padding: 14px;
+  border-radius: 20px;
+  background: var(--card);
+  border: 1px solid var(--card-edge);
+  box-shadow: var(--tile-shadow);
+}
+.levelBadge {
+  width: 52px;
+  height: 52px;
+  border-radius: 16px;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(160deg, var(--kin-soft), var(--card));
+  border: 2px solid var(--kin);
+  font-weight: 900;
+  line-height: 1;
+  text-align: center;
+}
+.levelBadge small {
+  display: block;
+  font-size: 9px;
+  color: var(--kin);
+}
+.levelBadge b {
+  font-size: 20px;
+}
+.expTrack {
+  height: 8px;
+  margin-top: 6px;
+  border-radius: 999px;
+  background: var(--paper-2);
+  overflow: hidden;
+}
+.expFill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--kin), #e7c060);
+  border-radius: inherit;
+  transform-origin: left;
+  transition: transform 0.8s cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+.bigButton {
+  width: 100%;
+  height: 60px;
+  white-space: nowrap;
+  margin-top: 16px;
+  font-size: 19px !important;
+}
+.menuGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 12px;
+}
+.menuItem {
+  height: 64px;
+  border-radius: 16px;
+  border: 1px solid var(--card-edge);
+  background: var(--card);
+  box-shadow: var(--tile-shadow);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  font-size: 12px;
+  font-weight: 900;
+}
+.menuItem span {
+  font-size: 20px;
+}
+
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(env(safe-area-inset-bottom) + 150px);
+  z-index: 90;
+  transform: translateX(-50%);
+  padding: 10px 16px;
+  border-radius: 999px;
+  background: var(--ink);
+  color: var(--paper);
+  font-size: 13px;
+  font-weight: 900;
+  white-space: nowrap;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.25);
+  animation: toastIn 3.2s ease forwards;
+  pointer-events: none;
+}
+@keyframes toastIn {
+  0% { opacity: 0; transform: translate(-50%, 10px); }
+  10%, 85% { opacity: 1; transform: translate(-50%, 0); }
+  100% { opacity: 0; transform: translate(-50%, 6px); }
+}
+
+.levelHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 18px 2px 8px;
+  font-size: 14px;
+  font-weight: 900;
+}
+.levelHead small {
+  font-size: 11px;
+  color: var(--ink-faint);
+  font-weight: 800;
+}
+.stageCard {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 64px 1fr auto;
+  gap: 12px;
+  align-items: center;
+  padding: 12px;
+  border-radius: 18px;
+  border: 1px solid var(--card-edge);
+  background: var(--card);
+  box-shadow: var(--tile-shadow);
+  text-align: left;
+}
+.stageCard:active {
+  transform: translateY(2px);
+}
+.stageThumb {
+  width: 64px;
+  height: 64px;
+  border-radius: 14px;
+  display: grid;
+  place-items: center;
+  background: var(--paper);
+  border: 1px solid var(--card-edge);
+  font-size: 40px;
+}
+.stars {
+  display: inline-flex;
+  gap: 2px;
+  font-size: 15px;
+  letter-spacing: -1px;
+}
+.stars i {
+  font-style: normal;
+  color: var(--card-edge);
+}
+.stars i[data-on="true"] {
+  color: var(--kin);
+}
+.emptyStage {
+  padding: 12px;
+  border-radius: 16px;
+  border: 1px dashed var(--card-edge);
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--ink-faint);
+  text-align: center;
+}
+
+.achievement {
+  display: grid;
+  grid-template-columns: 40px 1fr auto;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 0;
+  border-top: 1px solid var(--card-edge);
+}
+.achievement[data-on="false"] {
+  opacity: 0.55;
+}
+.medal {
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  font-size: 18px;
+  background: var(--kin-soft);
+  border: 2px solid var(--kin);
+}
+.achievement[data-on="false"] .medal {
+  background: var(--paper-2);
+  border-color: var(--card-edge);
+  filter: grayscale(1);
+}
+
+.settingRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 0;
+  border-top: 1px solid var(--card-edge);
+  font-size: 14px;
+  font-weight: 900;
+}
+.segment {
+  display: inline-flex;
+  padding: 3px;
+  gap: 3px;
+  border-radius: 11px;
+  background: var(--paper-2);
+}
+.segment button {
+  height: 32px;
+  padding: 0 10px;
+  border-radius: 8px;
+  border: 0;
+  background: transparent;
+  font-size: 12px;
+  font-weight: 900;
+  color: var(--ink-soft);
+}
+.segment button[aria-pressed="true"] {
+  background: var(--card);
+  color: var(--ink);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.14);
+}
+.danger {
+  color: var(--shu) !important;
+}
+
+/* ---------- クリア ---------- */
+.clearTitle {
+  text-align: center;
+  font-size: 30px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: var(--shu);
+}
+.clearStars {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin: 12px 0 6px;
+}
+.clearStar {
+  font-size: 46px;
+  line-height: 1;
+  color: var(--card-edge);
+  transform: scale(0.4);
+  opacity: 0;
+  animation: starIn 0.5s cubic-bezier(0.2, 1.5, 0.4, 1) forwards;
+}
+.clearStar[data-on="true"] {
+  color: var(--kin);
+  text-shadow: 0 0 16px color-mix(in srgb, var(--kin) 60%, transparent);
+}
+@keyframes starIn {
+  to { transform: scale(1); opacity: 1; }
+}
+.rewardRows {
+  display: grid;
+  gap: 6px;
+  margin-top: 12px;
+}
+.rewardRow {
+  display: flex;
+  justify-content: space-between;
+  padding: 9px 12px;
+  border-radius: 12px;
+  background: var(--paper);
+  font-size: 14px;
+  font-weight: 900;
+}
+.rewardRow b {
+  font-variant-numeric: tabular-nums;
+}
+.celebrate {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+.celebrate i {
+  position: absolute;
+  top: -12px;
+  width: 8px;
+  height: 14px;
+  border-radius: 2px;
+  opacity: 0;
+  animation: fall 2.2s cubic-bezier(0.3, 0.4, 0.5, 1) forwards;
+}
+@keyframes fall {
+  0% { opacity: 1; transform: translate3d(0, 0, 0) rotate(0deg); }
+  100% { opacity: 0; transform: translate3d(var(--dx), 92vh, 0) rotate(540deg); }
+}
+
+.note {
+  margin-top: 10px;
+  font-size: 11.5px;
+  line-height: 1.6;
+  font-weight: 700;
+  color: var(--ink-faint);
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .root *,
+  .root *::before,
+  .root *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  .clearStar {
+    opacity: 1;
+    transform: none;
+  }
+}
