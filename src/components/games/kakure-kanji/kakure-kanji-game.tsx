@@ -194,6 +194,10 @@ export function KakureKanjiGame() {
           <p className={styles.note}>
             効果音の大きさは、アプリの「タップ音」の音量に合わせています。記録はこの端末に保存されます（墨コインはこのゲームの中だけで使うコインで、アプリのほかのコインとは別です）。
           </p>
+          <p className={styles.note}>
+            ステージ4〜10の筆画：<a href="https://kanjivg.tagaini.net/" target="_blank" rel="noreferrer">KanjiVG</a>
+            {" "}（CC BY-SA 3.0）。<a href="/licenses/kakure-kanji/README.txt" target="_blank" rel="noreferrer">出典・変更内容・原図とライセンス</a>
+          </p>
         </Sheet>
       )}
 
@@ -221,7 +225,7 @@ export function KakureKanjiGame() {
               </div>
             );
           })}
-          {STAGES.length < 10 && <p className={styles.note}>いま遊べるステージは{STAGES.length}個です。10・100ステージの実績は、問題が増えると達成できるようになります。</p>}
+          {STAGES.length < 100 && <p className={styles.note}>いま遊べるステージは{STAGES.length}個です。{STAGES.length < 10 ? "10・100" : "100"}ステージの実績は、問題が増えると達成できるようになります。</p>}
         </Sheet>
       )}
 
