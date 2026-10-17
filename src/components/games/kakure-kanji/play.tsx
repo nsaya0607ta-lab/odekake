@@ -88,13 +88,12 @@ export function PlayScreen({
   const [feedback, setFeedback] = useState<Feedback>({ tone: "plain", text: START_MESSAGE, key: 0 });
   const [shake, setShake] = useState(0);
   const [glow, setGlow] = useState<{ strokes: number[]; key: number } | null>(null);
-  const [pop, setPop] = useState<{ char: string; key: number } | null>(null);
+  const [pop, setPop] = useState<{ chars: string[]; key: number } | null>(null);
   const [scorePop, setScorePop] = useState<{ points: number; key: number } | null>(null);
   const [boardPulse, setBoardPulse] = useState(0);
   const [flyers, setFlyers] = useState<Flyer[]>([]);
   const [hintTarget, setHintTarget] = useState<string | null>(null);
   const [detail, setDetail] = useState<Answer | null>(null);
-  const [answerChoices, setAnswerChoices] = useState<Answer[] | null>(null);
   const [clear, setClear] = useState<{ reward: ClearReward; round: RoundState } | null>(null);
   const [confirmSkip, setConfirmSkip] = useState(false);
   const [complete, setComplete] = useState(false);
@@ -118,19 +117,14 @@ export function PlayScreen({
     setFlyers((list) => [...list, { key: seq.current++, char, from: board, to: slot }]);
   }, []);
 
-  const handleSubmit = useCallback((answerChar?: string) => {
+  const handleSubmit = useCallback(() => {
     const current = readSave();
     const live = current.rounds[stage.id];
     if (!live || live.completedAt !== null) return;
     const now = Date.now();
-    const outcome = submit(stage, live, selected, now, answerChar);
+    const outcome = submit(stage, live, selected, now);
     const result = outcome.result;
     if (!result) return;
-    if (result.kind === "ambiguous") {
-      setAnswerChoices(result.answers);
-      return;
-    }
-    setAnswerChoices(null);
     const key = seq.current++;
     setGlow(null);
     if (result.kind === "empty") {
@@ -147,10 +141,11 @@ export function PlayScreen({
     const unlocked: AchievementId[] = [...recorded.unlocked];
 
     let secretCoins = 0;
-    if (outcome.gained?.secret) {
-      const secret = recordSecret(next, stage, outcome.gained.answer.char, outcome.gained.points, live.clearedAt !== null, now);
+    for (const discovery of outcome.gained?.discoveries ?? []) {
+      if (!discovery.secret) continue;
+      const secret = recordSecret(next, stage, discovery.answer.char, discovery.points, live.clearedAt !== null, now);
       next = secret.save;
-      secretCoins = secret.coins;
+      secretCoins += secret.coins;
       unlocked.push(...secret.achievements);
     }
 
@@ -163,20 +158,22 @@ export function PlayScreen({
     commit(next);
 
     if (outcome.gained) {
-      const { answer, points, secret } = outcome.gained;
+      const { discoveries, points, secret } = outcome.gained;
+      const chars = discoveries.map(({ answer }) => answer.char);
+      const label = chars.join("・");
       setSelected(new Set());
       setFeedback({
         tone: "good",
         text: secret
-          ? `シークレット発見！「${answer.char}」 +${points}点${secretCoins ? `・墨コイン+${secretCoins}枚` : ""}`
-          : `「${answer.char}」を見つけた！ +${points}点`,
+          ? `シークレット発見！「${label}」 +${points}点${secretCoins ? `・墨コイン+${secretCoins}枚` : ""}`
+          : `「${label}」を見つけた！ +${points}点`,
         key,
       });
       setGlow({ strokes: [...normalizeSelection(stage, selected)], key });
       setBoardPulse(key);
       setScorePop({ points, key });
-      later(() => launchFlyer(answer.char), 80);
-      later(() => setPop({ char: answer.char, key }), 600);
+      later(() => chars.forEach(launchFlyer), 80);
+      later(() => setPop({ chars, key }), 600);
       playSfx("correct", sound);
       navigator.vibrate?.(12);
     } else if (result.kind === "duplicate" || result.kind === "pending") {
@@ -224,9 +221,11 @@ export function PlayScreen({
       setSelected(new Set());
       const key = seq.current++;
       const answer = stage.answers.find((a) => a.char === answerChar);
+      const opened = nextRound.found.filter((char) => !live.found.includes(char));
       setGlow({ strokes: answer?.strokeSets[0] ?? [], key });
-      setFeedback({ tone: "info", text: `「${answerChar}」を開きました（点数は入りません）`, key });
-      later(() => launchFlyer(answerChar), 60);
+      setFeedback({ tone: "info", text: `「${opened.join("・")}」を開きました（点数は入りません）`, key });
+      later(() => opened.forEach(launchFlyer), 60);
+      later(() => setPop({ chars: opened, key }), 600);
       if (nextRound.completedAt !== null && live.completedAt === null && live.clearedAt !== null) later(() => setComplete(true), 1000);
       if (nextRound.clearedAt !== null && live.clearedAt === null) {
         const done = completeStage(next, stage, nextRound, now);
@@ -277,7 +276,7 @@ export function PlayScreen({
         data-found={isFound ? "true" : "false"}
         data-secret={secret ? "true" : undefined}
         data-revealed={round.revealed.includes(answer.char) ? "true" : undefined}
-        data-pop={pop?.char === answer.char ? "true" : undefined}
+        data-pop={pop?.chars.includes(answer.char) ? "true" : undefined}
         onClick={() => (isFound ? setDetail(answer) : setHintTarget(answer.char))}
         aria-label={isFound ? `${name}「${answer.char}」見つけた。説明を見る` : `${name} まだ見つけていない（${TIER_LABEL[answer.tier]}）。ヒントを見る`}
       >
@@ -417,22 +416,6 @@ export function PlayScreen({
         <FlyingChar key={f.key} flyer={f} onDone={() => setFlyers((list) => list.filter((x) => x.key !== f.key))} />
       ))}
 
-      {answerChoices && (
-        <Sheet title="答える漢字をえらぶ" onClose={() => setAnswerChoices(null)} center>
-          <p className={styles.explainText}>線の長さや比率を見立てると、同じ線から複数の漢字が見つかります。</p>
-          <div style={{ display: "grid", gap: 8, marginTop: 16 }}>
-            {answerChoices.map((answer) => (
-              <button key={answer.char} type="button" className={styles.secondary} style={{ minHeight: 56 }}
-                aria-label={`「${answer.char}」で答える${found.has(answer.char) ? "（見つけ済み）" : ""}`}
-                onClick={() => handleSubmit(answer.char)}>
-                <b className={styles.mincho} style={{ fontSize: 28, marginRight: 12 }}>{answer.char}</b>
-                {answer.readings.join("・")}{found.has(answer.char) ? "（見つけ済み）" : ""}
-              </button>
-            ))}
-          </div>
-        </Sheet>
-      )}
-
       {hintTarget && (
         <HintSheet
           stage={stage}
@@ -519,7 +502,6 @@ const START_MESSAGE = "大きな漢字の線をタップして黒くしよう。
 const KIND_LABEL: Record<JudgeResult["kind"], string> = {
   correct: "正解",
   duplicate: "見つけ済み",
-  ambiguous: "漢字を選択",
   pending: "確認中",
   whole: "全部の線",
   wrong: "ちがう",

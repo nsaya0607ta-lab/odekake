@@ -185,7 +185,7 @@ const STAGE_DATA = [
           ]
         ],
         "rule": "loose",
-        "evidence": "上か右下の木から、つながる左右の払い2本をえらぶよ。先端の比率を見立てると入にもなるので、答える字を選ぶ。",
+        "evidence": "上か右下の木から、つながる左右の払い2本をえらぶよ。先端の比率を見立てると入にもなるので、両方を一緒に見つけるよ。",
         "tier": 2,
         "meaning": "ひと",
         "grade": 1,
@@ -195,7 +195,7 @@ const STAGE_DATA = [
           "ニン",
           "と"
         ],
-        "partHint": "上か右下の木から、つながる左右の払い2本をえらぶよ。先端の比率を見立てると入にもなるので、答える字を選ぶ。",
+        "partHint": "上か右下の木から、つながる左右の払い2本をえらぶよ。先端の比率を見立てると入にもなるので、両方を一緒に見つけるよ。",
         "verification": {
           "status": "verified",
           "note": "日本の筆順・筆画図と対応する画の組を照合。線を動かさず、全画を使ったときの本数・種類・位置関係を確認。"
@@ -214,7 +214,7 @@ const STAGE_DATA = [
           ]
         ],
         "rule": "loose",
-        "evidence": "つながる左右の払いで、右の払いが上へ続く長さを見立てるよ。人と同じ画の組では、答える字を選ぶ。",
+        "evidence": "つながる左右の払いで、右の払いが上へ続く長さを見立てるよ。人と同じ画の組では、両方を一緒に見つけるよ。",
         "tier": 3,
         "meaning": "はいる",
         "grade": 1,
@@ -224,7 +224,7 @@ const STAGE_DATA = [
           "ジュ",
           "はいる"
         ],
-        "partHint": "つながる左右の払いで、右の払いが上へ続く長さを見立てるよ。人と同じ画の組では、答える字を選ぶ。",
+        "partHint": "つながる左右の払いで、右の払いが上へ続く長さを見立てるよ。人と同じ画の組では、両方を一緒に見つけるよ。",
         "verification": {
           "status": "verified",
           "note": "日本の筆順・筆画図と対応する画の組を照合。線を動かさず、全画を使ったときの本数・種類・位置関係を確認。"
@@ -398,7 +398,7 @@ const STAGE_DATA = [
     "verification": {
       "status": "verified",
       "checkedOn": "2026-10-17",
-      "note": "KanjiVGの日本の筆画図・部品構造、KANJIDIC2の字・読み・学年を照合。候補の全一覧と除外理由は docs/kakure-kanji-answers-004-010.md。比率だけで複数の字に見立てられる組は、答える字を選ぶ。"
+      "note": "KanjiVGの日本の筆画図・部品構造、KANJIDIC2の字・読み・学年を照合。候補の全一覧と除外理由は docs/kakure-kanji-answers-004-010.md。同じ画の組を共有する字は、一度の回答でまとめて発見する。曰は日へ統合。"
     }
   },
   {
@@ -550,33 +550,6 @@ const STAGE_DATA = [
           "status": "verified",
           "note": "日本の筆順・筆画図と対応する画の組を照合。線を動かさず、全画を使ったときの本数・種類・位置関係を確認。"
         }
-      },
-      {
-        "char": "曰",
-        "strokeSets": [
-          [
-            1,
-            2,
-            3,
-            4
-          ]
-        ],
-        "rule": "loose",
-        "evidence": "日と同じ4画を、横に広い字の比率に見立てるよ。日と同じ組なので、答える字を選ぶ。",
-        "tier": 3,
-        "meaning": "いう・いわく",
-        "grade": null,
-        "rare": true,
-        "readings": [
-          "エツ",
-          "いわく",
-          "ここに"
-        ],
-        "partHint": "日と同じ4画を、横に広い字の比率に見立てるよ。日と同じ組なので、答える字を選ぶ。",
-        "verification": {
-          "status": "verified",
-          "note": "日本の筆順・筆画図と対応する画の組を照合。線を動かさず、全画を使ったときの本数・種類・位置関係を確認。"
-        }
       }
     ],
     "nearMisses": [
@@ -614,7 +587,7 @@ const STAGE_DATA = [
     "verification": {
       "status": "verified",
       "checkedOn": "2026-10-17",
-      "note": "KanjiVGの日本の筆画図・部品構造、KANJIDIC2の字・読み・学年を照合。候補の全一覧と除外理由は docs/kakure-kanji-answers-004-010.md。比率だけで複数の字に見立てられる組は、答える字を選ぶ。"
+      "note": "KanjiVGの日本の筆画図・部品構造、KANJIDIC2の字・読み・学年を照合。候補の全一覧と除外理由は docs/kakure-kanji-answers-004-010.md。同じ画の組を共有する字は、一度の回答でまとめて発見する。曰は日へ統合。"
     }
   },
   {
@@ -819,7 +792,7 @@ const STAGE_DATA = [
           ]
         ],
         "rule": "loose",
-        "evidence": "田のまんなかの縦画と、独立した横画2本をえらぶよ。横画の長さの比率を見立てると士にもなるので、答える字を選ぶ。",
+        "evidence": "田のまんなかの縦画と、独立した横画2本をえらぶよ。横画の長さの比率を見立てると士にもなるので、両方を一緒に見つけるよ。",
         "tier": 2,
         "meaning": "つち",
         "grade": 1,
@@ -829,7 +802,7 @@ const STAGE_DATA = [
           "ト",
           "つち"
         ],
-        "partHint": "田のまんなかの縦画と、独立した横画2本をえらぶよ。横画の長さの比率を見立てると士にもなるので、答える字を選ぶ。",
+        "partHint": "田のまんなかの縦画と、独立した横画2本をえらぶよ。横画の長さの比率を見立てると士にもなるので、両方を一緒に見つけるよ。",
         "verification": {
           "status": "verified",
           "note": "日本の筆順・筆画図と対応する画の組を照合。線を動かさず、全画を使ったときの本数・種類・位置関係を確認。"
@@ -845,7 +818,7 @@ const STAGE_DATA = [
           ]
         ],
         "rule": "loose",
-        "evidence": "田のまんなかの縦画と横画2本を、士の長さの比率に見立てるよ。土と同じ組なので、答える字を選ぶ。",
+        "evidence": "田のまんなかの縦画と横画2本を、士の長さの比率に見立てるよ。土と同じ組なので、両方を一緒に見つけるよ。",
         "tier": 3,
         "meaning": "さむらい・学問をする人",
         "grade": 5,
@@ -854,7 +827,7 @@ const STAGE_DATA = [
           "シ",
           "さむらい"
         ],
-        "partHint": "田のまんなかの縦画と横画2本を、士の長さの比率に見立てるよ。土と同じ組なので、答える字を選ぶ。",
+        "partHint": "田のまんなかの縦画と横画2本を、士の長さの比率に見立てるよ。土と同じ組なので、両方を一緒に見つけるよ。",
         "verification": {
           "status": "verified",
           "note": "日本の筆順・筆画図と対応する画の組を照合。線を動かさず、全画を使ったときの本数・種類・位置関係を確認。"
@@ -885,33 +858,6 @@ const STAGE_DATA = [
           "こころざし"
         ],
         "partHint": "田から士の形をえらび、下の心を全部足すよ。",
-        "verification": {
-          "status": "verified",
-          "note": "日本の筆順・筆画図と対応する画の組を照合。線を動かさず、全画を使ったときの本数・種類・位置関係を確認。"
-        }
-      },
-      {
-        "char": "曰",
-        "strokeSets": [
-          [
-            1,
-            2,
-            4,
-            5
-          ]
-        ],
-        "rule": "loose",
-        "evidence": "田からまんなかの縦画を外し、横に広い曰の比率に見立てるよ。日と同じ組なので、答える字を選ぶ。",
-        "tier": 3,
-        "meaning": "いう・いわく",
-        "grade": null,
-        "rare": true,
-        "readings": [
-          "エツ",
-          "いわく",
-          "ここに"
-        ],
-        "partHint": "田からまんなかの縦画を外し、横に広い曰の比率に見立てるよ。日と同じ組なので、答える字を選ぶ。",
         "verification": {
           "status": "verified",
           "note": "日本の筆順・筆画図と対応する画の組を照合。線を動かさず、全画を使ったときの本数・種類・位置関係を確認。"
@@ -953,7 +899,7 @@ const STAGE_DATA = [
     "verification": {
       "status": "verified",
       "checkedOn": "2026-10-17",
-      "note": "KanjiVGの日本の筆画図・部品構造、KANJIDIC2の字・読み・学年を照合。候補の全一覧と除外理由は docs/kakure-kanji-answers-004-010.md。比率だけで複数の字に見立てられる組は、答える字を選ぶ。"
+      "note": "KanjiVGの日本の筆画図・部品構造、KANJIDIC2の字・読み・学年を照合。候補の全一覧と除外理由は docs/kakure-kanji-answers-004-010.md。同じ画の組を共有する字は、一度の回答でまとめて発見する。曰は日へ統合。"
     }
   },
   {
@@ -1313,39 +1259,6 @@ const STAGE_DATA = [
           "status": "verified",
           "note": "日本の筆順・筆画図と対応する画の組を照合。線を動かさず、全画を使ったときの本数・種類・位置関係を確認。"
         }
-      },
-      {
-        "char": "曰",
-        "strokeSets": [
-          [
-            5,
-            6,
-            7,
-            9
-          ],
-          [
-            5,
-            6,
-            8,
-            9
-          ]
-        ],
-        "rule": "loose",
-        "evidence": "目の中の横画を1本外し、横に広い曰の比率に見立てるよ。日と同じ組なので、答える字を選ぶ。",
-        "tier": 3,
-        "meaning": "いう・いわく",
-        "grade": null,
-        "rare": true,
-        "readings": [
-          "エツ",
-          "いわく",
-          "ここに"
-        ],
-        "partHint": "目の中の横画を1本外し、横に広い曰の比率に見立てるよ。日と同じ組なので、答える字を選ぶ。",
-        "verification": {
-          "status": "verified",
-          "note": "日本の筆順・筆画図と対応する画の組を照合。線を動かさず、全画を使ったときの本数・種類・位置関係を確認。"
-        }
       }
     ],
     "nearMisses": [
@@ -1383,7 +1296,7 @@ const STAGE_DATA = [
     "verification": {
       "status": "verified",
       "checkedOn": "2026-10-17",
-      "note": "KanjiVGの日本の筆画図・部品構造、KANJIDIC2の字・読み・学年を照合。候補の全一覧と除外理由は docs/kakure-kanji-answers-004-010.md。比率だけで複数の字に見立てられる組は、答える字を選ぶ。"
+      "note": "KanjiVGの日本の筆画図・部品構造、KANJIDIC2の字・読み・学年を照合。候補の全一覧と除外理由は docs/kakure-kanji-answers-004-010.md。同じ画の組を共有する字は、一度の回答でまとめて発見する。曰は日へ統合。"
     }
   },
   {
@@ -1654,33 +1567,6 @@ const STAGE_DATA = [
         }
       },
       {
-        "char": "曰",
-        "strokeSets": [
-          [
-            6,
-            7,
-            8,
-            9
-          ]
-        ],
-        "rule": "loose",
-        "evidence": "まんなかの日を、横に広い曰の比率に見立てるよ。日と同じ組なので、答える字を選ぶ。",
-        "tier": 3,
-        "meaning": "いう・いわく",
-        "grade": null,
-        "rare": true,
-        "readings": [
-          "エツ",
-          "いわく",
-          "ここに"
-        ],
-        "partHint": "まんなかの日を、横に広い曰の比率に見立てるよ。日と同じ組なので、答える字を選ぶ。",
-        "verification": {
-          "status": "verified",
-          "note": "日本の筆順・筆画図と対応する画の組を照合。線を動かさず、全画を使ったときの本数・種類・位置関係を確認。"
-        }
-      },
-      {
         "char": "咅",
         "strokeSets": [
           [
@@ -1739,7 +1625,7 @@ const STAGE_DATA = [
     "verification": {
       "status": "verified",
       "checkedOn": "2026-10-17",
-      "note": "KanjiVGの日本の筆画図・部品構造、KANJIDIC2の字・読み・学年を照合。候補の全一覧と除外理由は docs/kakure-kanji-answers-004-010.md。比率だけで複数の字に見立てられる組は、答える字を選ぶ。"
+      "note": "KanjiVGの日本の筆画図・部品構造、KANJIDIC2の字・読み・学年を照合。候補の全一覧と除外理由は docs/kakure-kanji-answers-004-010.md。同じ画の組を共有する字は、一度の回答でまとめて発見する。曰は日へ統合。"
     }
   },
   {
@@ -2193,7 +2079,7 @@ const STAGE_DATA = [
     "verification": {
       "status": "verified",
       "checkedOn": "2026-10-17",
-      "note": "KanjiVGの日本の筆画図・部品構造、KANJIDIC2の字・読み・学年を照合。候補の全一覧と除外理由は docs/kakure-kanji-answers-004-010.md。比率だけで複数の字に見立てられる組は、答える字を選ぶ。"
+      "note": "KanjiVGの日本の筆画図・部品構造、KANJIDIC2の字・読み・学年を照合。候補の全一覧と除外理由は docs/kakure-kanji-answers-004-010.md。同じ画の組を共有する字は、一度の回答でまとめて発見する。曰は日へ統合。"
     }
   },
   {
@@ -2609,7 +2495,7 @@ const STAGE_DATA = [
     "verification": {
       "status": "verified",
       "checkedOn": "2026-10-17",
-      "note": "KanjiVGの日本の筆画図・部品構造、KANJIDIC2の字・読み・学年を照合。候補の全一覧と除外理由は docs/kakure-kanji-answers-004-010.md。比率だけで複数の字に見立てられる組は、答える字を選ぶ。"
+      "note": "KanjiVGの日本の筆画図・部品構造、KANJIDIC2の字・読み・学年を照合。候補の全一覧と除外理由は docs/kakure-kanji-answers-004-010.md。同じ画の組を共有する字は、一度の回答でまとめて発見する。曰は日へ統合。"
     }
   }
 ] satisfies Omit<Stage, "strokes">[];
