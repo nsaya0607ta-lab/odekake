@@ -2,7 +2,7 @@ import type { Stage } from "../types";
 import glyphs from "./glyphs-004-010.json";
 
 /** 筆画は KanjiVG (CC BY-SA 3.0) を座標変換。出典・原SVG・ライセンス: /licenses/kakure-kanji/README.txt */
-const STAGE_DATA = [
+const STAGE_DATA: Omit<Stage, "strokes">[] = [
   {
     "id": "s004-mori",
     "number": 4,
@@ -185,7 +185,7 @@ const STAGE_DATA = [
           ]
         ],
         "rule": "loose",
-        "evidence": "上か右下の木から、つながる左右の払い2本をえらぶよ。先端の比率を見立てると入にもなるので、両方を一緒に見つけるよ。",
+        "evidence": "上か右下の木から、つながる左右の払い2本をえらぶよ。右払いの上部がはっきり突き出す入の形にはせず、人だけを正解にする。",
         "tier": 2,
         "meaning": "ひと",
         "grade": 1,
@@ -195,36 +195,7 @@ const STAGE_DATA = [
           "ニン",
           "と"
         ],
-        "partHint": "上か右下の木から、つながる左右の払い2本をえらぶよ。先端の比率を見立てると入にもなるので、両方を一緒に見つけるよ。",
-        "verification": {
-          "status": "verified",
-          "note": "日本の筆順・筆画図と対応する画の組を照合。線を動かさず、全画を使ったときの本数・種類・位置関係を確認。"
-        }
-      },
-      {
-        "char": "入",
-        "strokeSets": [
-          [
-            3,
-            4
-          ],
-          [
-            11,
-            12
-          ]
-        ],
-        "rule": "loose",
-        "evidence": "つながる左右の払いで、右の払いが上へ続く長さを見立てるよ。人と同じ画の組では、両方を一緒に見つけるよ。",
-        "tier": 3,
-        "meaning": "はいる",
-        "grade": 1,
-        "rare": false,
-        "readings": [
-          "ニュウ",
-          "ジュ",
-          "はいる"
-        ],
-        "partHint": "つながる左右の払いで、右の払いが上へ続く長さを見立てるよ。人と同じ画の組では、両方を一緒に見つけるよ。",
+        "partHint": "上か右下の木から、つながる左右の払い2本をえらぶよ。右払いの上部がはっきり突き出す入の形にはせず、人だけを正解にする。",
         "verification": {
           "status": "verified",
           "note": "日本の筆順・筆画図と対応する画の組を照合。線を動かさず、全画を使ったときの本数・種類・位置関係を確認。"
@@ -312,33 +283,6 @@ const STAGE_DATA = [
         }
       },
       {
-        "char": "杁",
-        "strokeSets": [
-          [
-            5,
-            6,
-            7,
-            8,
-            11,
-            12
-          ]
-        ],
-        "rule": "loose",
-        "evidence": "左下の木を全部えらび、右下の木から入の形になる左右の払いを足すよ。",
-        "tier": 3,
-        "meaning": "水を通す水門（いり）",
-        "grade": null,
-        "rare": true,
-        "readings": [
-          "いり"
-        ],
-        "partHint": "左下の木を全部えらび、右下の木から入の形になる左右の払いを足すよ。",
-        "verification": {
-          "status": "verified",
-          "note": "日本の筆順・筆画図と対応する画の組を照合。線を動かさず、全画を使ったときの本数・種類・位置関係を確認。"
-        }
-      },
-      {
         "char": "杕",
         "strokeSets": [
           [
@@ -387,6 +331,18 @@ const STAGE_DATA = [
         "reading": "カ",
         "category": "shape",
         "reason": "化の右側は曲がる画を含む匕です。森のまっすぐな払いを曲がる画に変えることはできません。"
+      },
+      {
+        "char": "入",
+        "reading": "ニュウ・はいる",
+        "category": "shape",
+        "reason": "上と右下の木の払い2本は人に近い形です。入のように右払いの上部がはっきり突き出す形ではないため、人だけを正解にします。"
+      },
+      {
+        "char": "杁",
+        "reading": "いり",
+        "category": "shape",
+        "reason": "左下の木に右下の払い2本を足しても、右側は人に近い形です。入の形にはしないため、杁も正解から外します。"
       }
     ],
     "reward": {
@@ -398,7 +354,10 @@ const STAGE_DATA = [
     "verification": {
       "status": "verified",
       "checkedOn": "2026-10-17",
-      "note": "KanjiVGの日本の筆画図・部品構造、KANJIDIC2の字・読み・学年を照合。候補の全一覧と除外理由は docs/kakure-kanji-answers-004-010.md。同じ画の組を共有する字は、一度の回答でまとめて発見する。曰は日へ統合。"
+      "note": "KanjiVGの日本の筆画図・部品構造、KANJIDIC2の字・読み・学年を照合。候補の全一覧と除外理由は docs/kakure-kanji-answers-004-010.md。同じ画の組には実際の字形に合う正解を一字だけ登録する。曰は日へ統合。"
+    },
+    "answerAliases": {
+      "入": "人"
     }
   },
   {
@@ -587,7 +546,10 @@ const STAGE_DATA = [
     "verification": {
       "status": "verified",
       "checkedOn": "2026-10-17",
-      "note": "KanjiVGの日本の筆画図・部品構造、KANJIDIC2の字・読み・学年を照合。候補の全一覧と除外理由は docs/kakure-kanji-answers-004-010.md。同じ画の組を共有する字は、一度の回答でまとめて発見する。曰は日へ統合。"
+      "note": "KanjiVGの日本の筆画図・部品構造、KANJIDIC2の字・読み・学年を照合。候補の全一覧と除外理由は docs/kakure-kanji-answers-004-010.md。同じ画の組には実際の字形に合う正解を一字だけ登録する。曰は日へ統合。"
+    },
+    "answerAliases": {
+      "曰": "日"
     }
   },
   {
@@ -783,32 +745,6 @@ const STAGE_DATA = [
         }
       },
       {
-        "char": "土",
-        "strokeSets": [
-          [
-            3,
-            4,
-            5
-          ]
-        ],
-        "rule": "loose",
-        "evidence": "田のまんなかの縦画と、独立した横画2本をえらぶよ。横画の長さの比率を見立てると士にもなるので、両方を一緒に見つけるよ。",
-        "tier": 2,
-        "meaning": "つち",
-        "grade": 1,
-        "rare": false,
-        "readings": [
-          "ド",
-          "ト",
-          "つち"
-        ],
-        "partHint": "田のまんなかの縦画と、独立した横画2本をえらぶよ。横画の長さの比率を見立てると士にもなるので、両方を一緒に見つけるよ。",
-        "verification": {
-          "status": "verified",
-          "note": "日本の筆順・筆画図と対応する画の組を照合。線を動かさず、全画を使ったときの本数・種類・位置関係を確認。"
-        }
-      },
-      {
         "char": "士",
         "strokeSets": [
           [
@@ -818,7 +754,7 @@ const STAGE_DATA = [
           ]
         ],
         "rule": "loose",
-        "evidence": "田のまんなかの縦画と横画2本を、士の長さの比率に見立てるよ。土と同じ組なので、両方を一緒に見つけるよ。",
+        "evidence": "田のまんなかの縦画と横画2本をえらぶよ。上の横画が下の横画より長いので、士だけを正解にする。",
         "tier": 3,
         "meaning": "さむらい・学問をする人",
         "grade": 5,
@@ -827,7 +763,7 @@ const STAGE_DATA = [
           "シ",
           "さむらい"
         ],
-        "partHint": "田のまんなかの縦画と横画2本を、士の長さの比率に見立てるよ。土と同じ組なので、両方を一緒に見つけるよ。",
+        "partHint": "田のまんなかの縦画と横画2本をえらぶよ。上の横画が下の横画より長いので、士だけを正解にする。",
         "verification": {
           "status": "verified",
           "note": "日本の筆順・筆画図と対応する画の組を照合。線を動かさず、全画を使ったときの本数・種類・位置関係を確認。"
@@ -888,6 +824,12 @@ const STAGE_DATA = [
         "reading": "シン",
         "category": "position",
         "reason": "申では中央の縦画が四角の上下に出ます。思の田の縦画を伸ばすことはできません。"
+      },
+      {
+        "char": "土",
+        "reading": "ド・ト・つち",
+        "category": "shape",
+        "reason": "田の中央の横画は、下の横画より長く描かれています。上の横画が長い士だけを正解にし、土は正解にしません。"
       }
     ],
     "reward": {
@@ -899,7 +841,11 @@ const STAGE_DATA = [
     "verification": {
       "status": "verified",
       "checkedOn": "2026-10-17",
-      "note": "KanjiVGの日本の筆画図・部品構造、KANJIDIC2の字・読み・学年を照合。候補の全一覧と除外理由は docs/kakure-kanji-answers-004-010.md。同じ画の組を共有する字は、一度の回答でまとめて発見する。曰は日へ統合。"
+      "note": "KanjiVGの日本の筆画図・部品構造、KANJIDIC2の字・読み・学年を照合。候補の全一覧と除外理由は docs/kakure-kanji-answers-004-010.md。同じ画の組には実際の字形に合う正解を一字だけ登録する。曰は日へ統合。"
+    },
+    "answerAliases": {
+      "曰": "日",
+      "土": "士"
     }
   },
   {
@@ -1296,7 +1242,10 @@ const STAGE_DATA = [
     "verification": {
       "status": "verified",
       "checkedOn": "2026-10-17",
-      "note": "KanjiVGの日本の筆画図・部品構造、KANJIDIC2の字・読み・学年を照合。候補の全一覧と除外理由は docs/kakure-kanji-answers-004-010.md。同じ画の組を共有する字は、一度の回答でまとめて発見する。曰は日へ統合。"
+      "note": "KanjiVGの日本の筆画図・部品構造、KANJIDIC2の字・読み・学年を照合。候補の全一覧と除外理由は docs/kakure-kanji-answers-004-010.md。同じ画の組には実際の字形に合う正解を一字だけ登録する。曰は日へ統合。"
+    },
+    "answerAliases": {
+      "曰": "日"
     }
   },
   {
@@ -1625,7 +1574,10 @@ const STAGE_DATA = [
     "verification": {
       "status": "verified",
       "checkedOn": "2026-10-17",
-      "note": "KanjiVGの日本の筆画図・部品構造、KANJIDIC2の字・読み・学年を照合。候補の全一覧と除外理由は docs/kakure-kanji-answers-004-010.md。同じ画の組を共有する字は、一度の回答でまとめて発見する。曰は日へ統合。"
+      "note": "KanjiVGの日本の筆画図・部品構造、KANJIDIC2の字・読み・学年を照合。候補の全一覧と除外理由は docs/kakure-kanji-answers-004-010.md。同じ画の組には実際の字形に合う正解を一字だけ登録する。曰は日へ統合。"
+    },
+    "answerAliases": {
+      "曰": "日"
     }
   },
   {
@@ -2079,7 +2031,7 @@ const STAGE_DATA = [
     "verification": {
       "status": "verified",
       "checkedOn": "2026-10-17",
-      "note": "KanjiVGの日本の筆画図・部品構造、KANJIDIC2の字・読み・学年を照合。候補の全一覧と除外理由は docs/kakure-kanji-answers-004-010.md。同じ画の組を共有する字は、一度の回答でまとめて発見する。曰は日へ統合。"
+      "note": "KanjiVGの日本の筆画図・部品構造、KANJIDIC2の字・読み・学年を照合。候補の全一覧と除外理由は docs/kakure-kanji-answers-004-010.md。同じ画の組には実際の字形に合う正解を一字だけ登録する。曰は日へ統合。"
     }
   },
   {
@@ -2495,10 +2447,10 @@ const STAGE_DATA = [
     "verification": {
       "status": "verified",
       "checkedOn": "2026-10-17",
-      "note": "KanjiVGの日本の筆画図・部品構造、KANJIDIC2の字・読み・学年を照合。候補の全一覧と除外理由は docs/kakure-kanji-answers-004-010.md。同じ画の組を共有する字は、一度の回答でまとめて発見する。曰は日へ統合。"
+      "note": "KanjiVGの日本の筆画図・部品構造、KANJIDIC2の字・読み・学年を照合。候補の全一覧と除外理由は docs/kakure-kanji-answers-004-010.md。同じ画の組には実際の字形に合う正解を一字だけ登録する。曰は日へ統合。"
     }
   }
-] satisfies Omit<Stage, "strokes">[];
+];
 
 export const STAGES_004_010: Stage[] = STAGE_DATA.map((stage) => ({
   ...stage,

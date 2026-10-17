@@ -46,48 +46,14 @@ export function matchesAnswer(answer: Answer, selected: readonly number[]): bool
   return answer.strokeSets.some((set) => sameSet(set, selected));
 }
 
-/** 同じ筆画の組を共有する答えは、どの取り出し方でも一緒に見つける。 */
-export function equivalentAnswers(stage: Stage, chars: Iterable<string>): Answer[] {
-  const answers = verifiedAnswers(stage);
-  const found = new Set(chars);
-  const keys = new Set<string>();
-  const keyOf = (ids: number[]) => [...ids].sort((a, b) => a - b).join(",");
-  let changed = true;
-  while (changed) {
-    changed = false;
-    for (const answer of answers) {
-      if (!found.has(answer.char) && !answer.strokeSets.some((ids) => keys.has(keyOf(ids)))) continue;
-      if (!found.has(answer.char)) {
-        found.add(answer.char);
-        changed = true;
-      }
-      for (const ids of answer.strokeSets) {
-        const key = keyOf(ids);
-        if (!keys.has(key)) {
-          keys.add(key);
-          changed = true;
-        }
-      }
-    }
-  }
-  return answers.filter((answer) => found.has(answer.char));
-}
-
 export function judgeStrokes(stage: Stage, selected: Iterable<number>, found: ReadonlySet<string>): JudgeResult {
   const picked = normalizeSelection(stage, selected);
   if (picked.length === 0) return { kind: "empty" };
   if (picked.length === stage.strokes.length) return { kind: "whole" };
 
-  const matches = verifiedAnswers(stage).filter((a) => matchesAnswer(a, picked));
-  const match = matches[0];
-  if (match) {
-    const group = equivalentAnswers(stage, matches.map((answer) => answer.char));
-    const answers = group.filter((answer) => !found.has(answer.char));
-    const answer = answers[0];
-    return answer
-      ? { kind: "correct", answer, answers }
-      : { kind: "duplicate", answer: match, answers: group };
-  }
+  // 各筆画の組には、実際の字形に合う正解を一字だけ登録する。
+  const answer = verifiedAnswers(stage).find((a) => matchesAnswer(a, picked));
+  if (answer) return { kind: found.has(answer.char) ? "duplicate" : "correct", answer, answers: [answer] };
   if (stage.answers.some((a) => matchesAnswer(a, picked))) return { kind: "pending" };
 
   // まだ見つけていない答えと1本ちがいなら、そっと教える（どの答えかは言わない）

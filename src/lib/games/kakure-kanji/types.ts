@@ -35,6 +35,7 @@ export type Stroke = {
  * - strokes: 筆画をえらんで取り出す。形と位置関係はそのまま（例：感 → 戈）
  * - loose: 見立て。線の長さ・比率・曲がりぐあい・はねの有無は問わないが、線の本数・向き（↙か↘か）・
  *   まがるかどうか・交わる／つく／はなれる・上下左右の位置関係は守る（例：感の2画目と7画目 → 八）
+ *   人／入・土／士のように字を区別する形は、実際の字形に合う片方だけを登録する。
  */
 export type ExtractRule = "component" | "strokes" | "loose";
 
@@ -96,6 +97,8 @@ export type Stage = {
   /** 部品の分け方（解説に出す） */
   structure: string;
   answers: Answer[];
+  /** 旧セーブの答えを現在の正解へ引き継ぐ対応。新しい正解判定には使わない。 */
+  answerAliases?: Record<string, string>;
   nearMisses: NearMiss[];
   reward: { coins: number; exp: number; replayCoins: number; replayExp: number };
   /** 問題全体の検証のようす */
