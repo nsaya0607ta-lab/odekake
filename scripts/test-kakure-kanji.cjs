@@ -39,7 +39,7 @@ const test = (name, fn) => {
 
 const kan = STAGES.find((s) => s.kanji === "感");
 assert.ok(kan, "ステージ「感」がある");
-const MAIN = ["一", "二", "三", "七", "八", "口", "心"]; // 小学校で習う字（クリアに必要）
+const MAIN = ["一", "二", "三", "八", "口", "心"]; // 小学校で習う字（クリアに必要）
 const SECRET = ["咸", "戈", "戌", "戊", "厂", "弋", "乂"]; // 小学校で習わない字（シークレット）
 const ANSWERS = [...MAIN, ...SECRET];
 const sorted = (list) => [...list].sort();
@@ -464,9 +464,6 @@ test("9. 見立ての答えは、向き・交わり・位置関係がその字�
   // 乂：↘と↙が交わる
   assert.equal(dir(8), "↙");
   assert.ok(cross(7, 8), "乂の2本は交わる");
-  // 七：横画を、右へまがる画が切る
-  assert.ok(cross(1, 7), "七：7画目が1画目を切る");
-  assert.ok(pts(7).at(-2).x - pts(7)[0].x > 20, "七：7画目は右へまがる（十ではない）");
 });
 
 test("9. 見つける字は小学校で習う字だけ（学年は配当表のとおり）。それ以外はシークレット", () => {
@@ -479,7 +476,7 @@ test("9. 見つける字は小学校で習う字だけ（学年は配当表の�
   }
   assert.deepEqual(sorted(E.mainAnswers(kan).map((a) => a.char)), sorted(MAIN));
   assert.deepEqual(sorted(E.secretAnswers(kan).map((a) => a.char)), sorted(SECRET));
-  assert.equal(kan.difficulty, "上級", "見つける字が7個なので上級（7〜10個）");
+  assert.equal(kan.difficulty, "中級", "見つける字が6個なので中級（4〜6個）");
 });
 test("9. 古い形のセーブデータ（シークレット前）も読める", () => {
   const old = P.defaultSave();
@@ -504,10 +501,10 @@ test("10. 戌・戊・戈・弋は、中の横画やノの有無で正しく分�
   assert.equal(judge([1, 2, 9, 7, 8]).answer.char, "戊", "点はもともと戊の右上の点");
   assert.notEqual(judge([1, 2, 10, 7, 8, 9]).kind, "correct", "心の点をまぜても戍にはならない");
 });
-test("10. 見立てで二・三・七・八・乂になり、十・人・部首だけの形は正解にならない", () => {
+test("10. 見立てで二・三・八・乂になり、七・十・人・部首だけの形は正解にならない", () => {
   for (const pair of [[1, 3], [1, 6], [3, 6]]) assert.equal(judge(pair).answer.char, "二", `二 ${pair}`);
   assert.equal(judge([1, 3, 6]).answer.char, "三");
-  assert.equal(judge([1, 7]).answer.char, "七");
+  assert.equal(judge([1, 7]).kind, "wrong", "1・7画目は七とはみなさない（7画目はななめにのびる線）");
   assert.equal(judge([2, 7]).answer.char, "八");
   assert.equal(judge([7, 8]).answer.char, "乂");
   assert.equal(judge([2, 8]).kind, "wrong", "↙と↙では八にならない");
