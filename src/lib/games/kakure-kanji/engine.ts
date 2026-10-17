@@ -23,7 +23,7 @@ export const COMBO_STEP = 0.1;
 export const COMBO_MAX_BONUS = 0.5;
 
 /** 答えた記録。text は正解なら字、ちがったら「3画」のような本数 */
-export type InputRecord = { text: string; kind: JudgeResult["kind"]; at: number };
+export type InputRecord = { text: string; kind: Exclude<JudgeResult["kind"], "ambiguous">; at: number };
 
 export type RoundState = {
   stageId: string;
@@ -124,11 +124,11 @@ export type SubmitOutcome = {
 };
 
 /** えらんだ筆画で答える */
-export function submit(stage: Stage, round: RoundState, selected: Iterable<number>, now: number): SubmitOutcome {
+export function submit(stage: Stage, round: RoundState, selected: Iterable<number>, now: number, answerChar?: string): SubmitOutcome {
   if (round.completedAt !== null) return { round, result: null, gained: null, cleared: false, completed: false };
   const picked = normalizeSelection(stage, selected);
-  const result = judgeStrokes(stage, picked, new Set(round.found));
-  if (result.kind === "empty") return { round, result, gained: null, cleared: false, completed: false };
+  const result = judgeStrokes(stage, picked, new Set(round.found), answerChar);
+  if (result.kind === "empty" || result.kind === "ambiguous") return { round, result, gained: null, cleared: false, completed: false };
 
   let next: RoundState = { ...round };
   let gained: SubmitOutcome["gained"] = null;

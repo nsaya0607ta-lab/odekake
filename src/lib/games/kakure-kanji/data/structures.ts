@@ -1,4 +1,6 @@
 import type { StrokeKind } from "../types";
+import extraStructures from "./structures-004-010.json";
+import componentVariants from "./component-variants-004-010.json";
 
 /**
  * 漢字の構造データ（補助）。日本の筆順での画の種類の並び。
@@ -47,7 +49,11 @@ export const STROKE_STRUCTURES: Record<string, StrokeKind[]> = {
   中: ["縦", "横折", "横", "縦"],
   不: ["横", "左払い", "縦", "点"],
   少: ["縦", "点", "左払い", "左払い"],
+  ...extraStructures as Record<string, StrokeKind[]>,
 };
+
+/** 木が偏になると右払いが点になるなど、辞書で確認できる部品の字形差。点と払いを一律に同一視しない。 */
+export const STROKE_STRUCTURE_VARIANTS = componentVariants as Record<string, StrokeKind[][]>;
 
 /** 標準の画数（構造データの長さと一致するかをテストで見る） */
 export const STROKE_COUNTS: Record<string, number> = {
@@ -55,6 +61,7 @@ export const STROKE_COUNTS: Record<string, number> = {
   戍: 6, 必: 5, 或: 8, 成: 6, 二: 2, 十: 2, 广: 3, 日: 4, 三: 3, 八: 2, 七: 2, 乂: 2, 人: 2,
   漢: 13, 称: 10, 大: 3, 夫: 4, 汁: 5, 木: 4, 千: 3, 小: 3, 丁: 2, 下: 3, 禾: 5,
   天: 4, 中: 4, 不: 4, 少: 4,
+  ...Object.fromEntries(Object.entries(extraStructures).map(([char, structure]) => [char, structure.length])),
 };
 
 /**

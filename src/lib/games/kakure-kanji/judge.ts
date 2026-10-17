@@ -11,6 +11,8 @@ import type { Answer, Stage } from "./types";
 export type JudgeResult =
   | { kind: "correct"; answer: Answer }
   | { kind: "duplicate"; answer: Answer }
+  /** 同じ画を比率の見立てで別の字にできるときは、答える字をプレイヤーが選ぶ。 */
+  | { kind: "ambiguous"; answers: Answer[] }
   /** 検証中の答えと同じ組（判定に使わない） */
   | { kind: "pending" }
   /** 全部の画をえらんだ（出題漢字そのもの） */
@@ -46,12 +48,14 @@ export function matchesAnswer(answer: Answer, selected: readonly number[]): bool
   return answer.strokeSets.some((set) => sameSet(set, selected));
 }
 
-export function judgeStrokes(stage: Stage, selected: Iterable<number>, found: ReadonlySet<string>): JudgeResult {
+export function judgeStrokes(stage: Stage, selected: Iterable<number>, found: ReadonlySet<string>, answerChar?: string): JudgeResult {
   const picked = normalizeSelection(stage, selected);
   if (picked.length === 0) return { kind: "empty" };
   if (picked.length === stage.strokes.length) return { kind: "whole" };
 
-  const answer = verifiedAnswers(stage).find((a) => matchesAnswer(a, picked));
+  const matches = verifiedAnswers(stage).filter((a) => matchesAnswer(a, picked));
+  if (matches.length > 1 && !matches.some((a) => a.char === answerChar)) return { kind: "ambiguous", answers: matches };
+  const answer = matches.find((a) => a.char === answerChar) ?? matches[0];
   if (answer) return found.has(answer.char) ? { kind: "duplicate", answer } : { kind: "correct", answer };
   if (stage.answers.some((a) => matchesAnswer(a, picked))) return { kind: "pending" };
 
@@ -74,6 +78,8 @@ export function resultMessage(result: JudgeResult, stageKanji: string): string {
       return `「${result.answer.char}」を見つけた！`;
     case "duplicate":
       return `「${result.answer.char}」はもう見つけています`;
+    case "ambiguous":
+      return "同じ線で見立てられる漢字があります。答える字を選んでね";
     case "pending":
       return "その形の字は確認中のため、今回は判定しません";
     case "whole":

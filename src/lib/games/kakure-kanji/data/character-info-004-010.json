@@ -1,0 +1,462 @@
+{
+  "一": {
+    "meaning": "ひとつ",
+    "grade": 1,
+    "rare": false,
+    "readings": [
+      "イチ",
+      "イツ",
+      "ひとつ"
+    ]
+  },
+  "丁": {
+    "meaning": "順序や区画を表す字",
+    "grade": 3,
+    "rare": false,
+    "readings": [
+      "チョウ",
+      "テイ",
+      "ひのと"
+    ]
+  },
+  "三": {
+    "meaning": "みっつ",
+    "grade": 1,
+    "rare": false,
+    "readings": [
+      "サン",
+      "ゾウ",
+      "みっつ"
+    ]
+  },
+  "二": {
+    "meaning": "ふたつ",
+    "grade": 1,
+    "rare": false,
+    "readings": [
+      "ニ",
+      "ジ",
+      "ふたたび"
+    ]
+  },
+  "五": {
+    "meaning": "いつつ",
+    "grade": 1,
+    "rare": false,
+    "readings": [
+      "ゴ",
+      "いつ",
+      "いつつ"
+    ]
+  },
+  "人": {
+    "meaning": "ひと",
+    "grade": 1,
+    "rare": false,
+    "readings": [
+      "ジン",
+      "ニン",
+      "と"
+    ]
+  },
+  "入": {
+    "meaning": "はいる",
+    "grade": 1,
+    "rare": false,
+    "readings": [
+      "ニュウ",
+      "ジュ",
+      "はいる"
+    ]
+  },
+  "八": {
+    "meaning": "やっつ",
+    "grade": 1,
+    "rare": false,
+    "readings": [
+      "ハチ",
+      "ハツ",
+      "よう"
+    ]
+  },
+  "十": {
+    "meaning": "とお・じゅう",
+    "grade": 1,
+    "rare": false,
+    "readings": [
+      "ジュウ",
+      "ジッ",
+      "そ"
+    ]
+  },
+  "卜": {
+    "meaning": "うらなう",
+    "grade": null,
+    "rare": true,
+    "readings": [
+      "ボク",
+      "うらなう",
+      "うらない"
+    ]
+  },
+  "口": {
+    "meaning": "くち",
+    "grade": 1,
+    "rare": false,
+    "readings": [
+      "コウ",
+      "ク",
+      "くち"
+    ]
+  },
+  "吾": {
+    "meaning": "われ・自分",
+    "grade": null,
+    "rare": true,
+    "readings": [
+      "ゴ",
+      "われ",
+      "あ"
+    ]
+  },
+  "咅": {
+    "meaning": "つばを吐く",
+    "grade": null,
+    "rare": true,
+    "readings": [
+      "トウ"
+    ]
+  },
+  "唔": {
+    "meaning": "声を出して読む",
+    "grade": null,
+    "rare": true,
+    "readings": [
+      "ゴ"
+    ]
+  },
+  "土": {
+    "meaning": "つち",
+    "grade": 1,
+    "rare": false,
+    "readings": [
+      "ド",
+      "ト",
+      "つち"
+    ]
+  },
+  "士": {
+    "meaning": "さむらい・学問をする人",
+    "grade": 5,
+    "rare": false,
+    "readings": [
+      "シ",
+      "さむらい"
+    ]
+  },
+  "大": {
+    "meaning": "おおきい",
+    "grade": 1,
+    "rare": false,
+    "readings": [
+      "ダイ",
+      "タイ",
+      "おおいに"
+    ]
+  },
+  "寸": {
+    "meaning": "長さの単位・わずか",
+    "grade": 6,
+    "rare": false,
+    "readings": [
+      "スン"
+    ]
+  },
+  "射": {
+    "meaning": "矢をいる",
+    "grade": 6,
+    "rare": false,
+    "readings": [
+      "シャ",
+      "いる",
+      "うつ"
+    ]
+  },
+  "工": {
+    "meaning": "つくる・細工する",
+    "grade": 2,
+    "rare": false,
+    "readings": [
+      "コウ",
+      "ク",
+      "グ"
+    ]
+  },
+  "心": {
+    "meaning": "こころ",
+    "grade": 2,
+    "rare": false,
+    "readings": [
+      "シン",
+      "こころ",
+      "ごころ"
+    ]
+  },
+  "志": {
+    "meaning": "こころざし",
+    "grade": 5,
+    "rare": false,
+    "readings": [
+      "シ",
+      "シリング",
+      "こころざし"
+    ]
+  },
+  "思": {
+    "meaning": "思",
+    "grade": 2,
+    "rare": false,
+    "readings": [
+      "シ",
+      "おもう",
+      "おぼす"
+    ]
+  },
+  "想": {
+    "meaning": "想",
+    "grade": 3,
+    "rare": false,
+    "readings": [
+      "ソウ",
+      "ソ",
+      "おもう"
+    ]
+  },
+  "意": {
+    "meaning": "意",
+    "grade": 3,
+    "rare": false,
+    "readings": [
+      "イ"
+    ]
+  },
+  "日": {
+    "meaning": "ひ・たいよう",
+    "grade": 1,
+    "rare": false,
+    "readings": [
+      "ニチ",
+      "ジツ",
+      "か"
+    ]
+  },
+  "旧": {
+    "meaning": "ふるい・以前の",
+    "grade": 5,
+    "rare": false,
+    "readings": [
+      "キュウ",
+      "ふるい",
+      "もと"
+    ]
+  },
+  "明": {
+    "meaning": "明",
+    "grade": 2,
+    "rare": false,
+    "readings": [
+      "メイ",
+      "ミョウ",
+      "あかす"
+    ]
+  },
+  "曰": {
+    "meaning": "いう・いわく",
+    "grade": null,
+    "rare": true,
+    "readings": [
+      "エツ",
+      "いわく",
+      "ここに"
+    ]
+  },
+  "月": {
+    "meaning": "つき",
+    "grade": 1,
+    "rare": false,
+    "readings": [
+      "ゲツ",
+      "ガツ",
+      "つき"
+    ]
+  },
+  "木": {
+    "meaning": "き",
+    "grade": 1,
+    "rare": false,
+    "readings": [
+      "ボク",
+      "モク",
+      "こ"
+    ]
+  },
+  "杁": {
+    "meaning": "水を通す水門（いり）",
+    "grade": null,
+    "rare": true,
+    "readings": [
+      "いり"
+    ]
+  },
+  "杕": {
+    "meaning": "一本だけで立つ木",
+    "grade": null,
+    "rare": true,
+    "readings": [
+      "テイ",
+      "ダイ",
+      "タ"
+    ]
+  },
+  "林": {
+    "meaning": "はやし",
+    "grade": 1,
+    "rare": false,
+    "readings": [
+      "リン",
+      "はやし"
+    ]
+  },
+  "森": {
+    "meaning": "森",
+    "grade": 1,
+    "rare": false,
+    "readings": [
+      "シン",
+      "もり"
+    ]
+  },
+  "田": {
+    "meaning": "た・たんぼ",
+    "grade": 1,
+    "rare": false,
+    "readings": [
+      "デン",
+      "た"
+    ]
+  },
+  "目": {
+    "meaning": "め",
+    "grade": 1,
+    "rare": false,
+    "readings": [
+      "モク",
+      "ボク",
+      "ま"
+    ]
+  },
+  "相": {
+    "meaning": "互い・すがた",
+    "grade": 3,
+    "rare": false,
+    "readings": [
+      "ソウ",
+      "ショウ",
+      "あい"
+    ]
+  },
+  "立": {
+    "meaning": "たつ",
+    "grade": 1,
+    "rare": false,
+    "readings": [
+      "リツ",
+      "リュウ",
+      "だてる"
+    ]
+  },
+  "言": {
+    "meaning": "いう・ことば",
+    "grade": 2,
+    "rare": false,
+    "readings": [
+      "ゲン",
+      "ゴン",
+      "こと"
+    ]
+  },
+  "訂": {
+    "meaning": "ただす・直す",
+    "grade": null,
+    "rare": false,
+    "readings": [
+      "テイ",
+      "ただす"
+    ]
+  },
+  "計": {
+    "meaning": "はかる・計画する",
+    "grade": 2,
+    "rare": false,
+    "readings": [
+      "ケイ",
+      "はかる",
+      "はからう"
+    ]
+  },
+  "訌": {
+    "meaning": "仲間どうしでもめる",
+    "grade": null,
+    "rare": true,
+    "readings": [
+      "コウ"
+    ]
+  },
+  "討": {
+    "meaning": "相手を攻める・よく調べる",
+    "grade": 6,
+    "rare": false,
+    "readings": [
+      "トウ",
+      "うつ"
+    ]
+  },
+  "語": {
+    "meaning": "語",
+    "grade": 2,
+    "rare": false,
+    "readings": [
+      "ゴ",
+      "かたる",
+      "かたらう"
+    ]
+  },
+  "謝": {
+    "meaning": "謝",
+    "grade": 5,
+    "rare": false,
+    "readings": [
+      "シャ",
+      "あやまる"
+    ]
+  },
+  "身": {
+    "meaning": "からだ・み",
+    "grade": 3,
+    "rare": false,
+    "readings": [
+      "シン",
+      "み"
+    ]
+  },
+  "音": {
+    "meaning": "おと",
+    "grade": 1,
+    "rare": false,
+    "readings": [
+      "オン",
+      "イン",
+      "ね"
+    ]
+  }
+}

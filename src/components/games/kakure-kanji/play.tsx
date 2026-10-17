@@ -94,6 +94,7 @@ export function PlayScreen({
   const [flyers, setFlyers] = useState<Flyer[]>([]);
   const [hintTarget, setHintTarget] = useState<string | null>(null);
   const [detail, setDetail] = useState<Answer | null>(null);
+  const [answerChoices, setAnswerChoices] = useState<Answer[] | null>(null);
   const [clear, setClear] = useState<{ reward: ClearReward; round: RoundState } | null>(null);
   const [confirmSkip, setConfirmSkip] = useState(false);
   const [complete, setComplete] = useState(false);
@@ -117,14 +118,19 @@ export function PlayScreen({
     setFlyers((list) => [...list, { key: seq.current++, char, from: board, to: slot }]);
   }, []);
 
-  const handleSubmit = useCallback(() => {
+  const handleSubmit = useCallback((answerChar?: string) => {
     const current = readSave();
     const live = current.rounds[stage.id];
     if (!live || live.completedAt !== null) return;
     const now = Date.now();
-    const outcome = submit(stage, live, selected, now);
+    const outcome = submit(stage, live, selected, now, answerChar);
     const result = outcome.result;
     if (!result) return;
+    if (result.kind === "ambiguous") {
+      setAnswerChoices(result.answers);
+      return;
+    }
+    setAnswerChoices(null);
     const key = seq.current++;
     setGlow(null);
     if (result.kind === "empty") {
@@ -194,7 +200,8 @@ export function PlayScreen({
         playSfx("clear", sound);
       }, 1200);
     }
-    if (outcome.completed) {
+    // シークレットのない問題など、クリアと完成が同時なら報酬画面だけを出す。
+    if (outcome.completed && !reward) {
       later(() => {
         setComplete(true);
         playSfx("clear", sound);
@@ -391,7 +398,7 @@ export function PlayScreen({
             <button type="button" className={styles.secondary} style={{ height: 52, padding: "0 16px" }} onClick={() => setSelected(new Set())} disabled={selected.size === 0}>
               けす
             </button>
-            <button type="button" className={`${styles.primary} ${styles.okButton}`} onClick={handleSubmit} disabled={selected.size === 0 || round.completedAt !== null}>
+            <button type="button" className={`${styles.primary} ${styles.okButton}`} onClick={() => handleSubmit()} disabled={selected.size === 0 || round.completedAt !== null}>
               OK<small>{selected.size > 0 ? `えらんだ線 ${selected.size}本で答える` : "線をタップしてえらぶ"}</small>
             </button>
           </div>
@@ -409,6 +416,22 @@ export function PlayScreen({
       {flyers.map((f) => (
         <FlyingChar key={f.key} flyer={f} onDone={() => setFlyers((list) => list.filter((x) => x.key !== f.key))} />
       ))}
+
+      {answerChoices && (
+        <Sheet title="答える漢字をえらぶ" onClose={() => setAnswerChoices(null)} center>
+          <p className={styles.explainText}>線の長さや比率を見立てると、同じ線から複数の漢字が見つかります。</p>
+          <div style={{ display: "grid", gap: 8, marginTop: 16 }}>
+            {answerChoices.map((answer) => (
+              <button key={answer.char} type="button" className={styles.secondary} style={{ minHeight: 56 }}
+                aria-label={`「${answer.char}」で答える${found.has(answer.char) ? "（見つけ済み）" : ""}`}
+                onClick={() => handleSubmit(answer.char)}>
+                <b className={styles.mincho} style={{ fontSize: 28, marginRight: 12 }}>{answer.char}</b>
+                {answer.readings.join("・")}{found.has(answer.char) ? "（見つけ済み）" : ""}
+              </button>
+            ))}
+          </div>
+        </Sheet>
+      )}
 
       {hintTarget && (
         <HintSheet
@@ -496,6 +519,7 @@ const START_MESSAGE = "大きな漢字の線をタップして黒くしよう。
 const KIND_LABEL: Record<JudgeResult["kind"], string> = {
   correct: "正解",
   duplicate: "見つけ済み",
+  ambiguous: "漢字を選択",
   pending: "確認中",
   whole: "全部の線",
   wrong: "ちがう",
