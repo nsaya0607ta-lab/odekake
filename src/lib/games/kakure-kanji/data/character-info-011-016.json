@@ -1,0 +1,319 @@
+{
+  "一": {
+    "readings": [
+      "イチ",
+      "ひとつ"
+    ],
+    "meaning": "ひとつ",
+    "grade": 1,
+    "rare": false
+  },
+  "丁": {
+    "readings": [
+      "チョウ",
+      "テイ"
+    ],
+    "meaning": "区画や順序を表す字",
+    "grade": 3,
+    "rare": false
+  },
+  "三": {
+    "readings": [
+      "サン",
+      "みっつ"
+    ],
+    "meaning": "みっつ",
+    "grade": 1,
+    "rare": false
+  },
+  "二": {
+    "readings": [
+      "ニ",
+      "ふたつ"
+    ],
+    "meaning": "ふたつ",
+    "grade": 1,
+    "rare": false
+  },
+  "人": {
+    "readings": [
+      "ジン",
+      "ニン",
+      "ひと"
+    ],
+    "meaning": "ひと",
+    "grade": 1,
+    "rare": false
+  },
+  "什": {
+    "readings": [
+      "ジュウ",
+      "シュウ"
+    ],
+    "meaning": "十をひと組とした数・日常の道具",
+    "grade": null,
+    "rare": true
+  },
+  "仁": {
+    "readings": [
+      "ジン",
+      "ニ"
+    ],
+    "meaning": "思いやり・いつくしみ",
+    "grade": 6,
+    "rare": false
+  },
+  "休": {
+    "readings": [
+      "キュウ",
+      "やすむ"
+    ],
+    "meaning": "やすむ",
+    "grade": 1,
+    "rare": false
+  },
+  "体": {
+    "readings": [
+      "タイ",
+      "からだ"
+    ],
+    "meaning": "からだ",
+    "grade": 2,
+    "rare": false
+  },
+  "八": {
+    "readings": [
+      "ハチ",
+      "やっつ"
+    ],
+    "meaning": "やっつ",
+    "grade": 1,
+    "rare": false
+  },
+  "十": {
+    "readings": [
+      "ジュウ",
+      "とお"
+    ],
+    "meaning": "とお",
+    "grade": 1,
+    "rare": false
+  },
+  "千": {
+    "readings": [
+      "セン",
+      "ち"
+    ],
+    "meaning": "せん",
+    "grade": 1,
+    "rare": false
+  },
+  "卜": {
+    "readings": [
+      "ボク",
+      "うらなう"
+    ],
+    "meaning": "うらなう",
+    "grade": null,
+    "rare": true
+  },
+  "口": {
+    "readings": [
+      "コウ",
+      "くち"
+    ],
+    "meaning": "くち",
+    "grade": 1,
+    "rare": false
+  },
+  "叶": {
+    "readings": [
+      "キョウ",
+      "かなう"
+    ],
+    "meaning": "望みがかなう",
+    "grade": null,
+    "rare": true
+  },
+  "吐": {
+    "readings": [
+      "ト",
+      "はく"
+    ],
+    "meaning": "はく・外へ出す",
+    "grade": null,
+    "rare": false
+  },
+  "土": {
+    "readings": [
+      "ド",
+      "ト",
+      "つち"
+    ],
+    "meaning": "つち",
+    "grade": 1,
+    "rare": false
+  },
+  "大": {
+    "readings": [
+      "ダイ",
+      "タイ",
+      "おおきい"
+    ],
+    "meaning": "おおきい",
+    "grade": 1,
+    "rare": false
+  },
+  "干": {
+    "readings": [
+      "カン",
+      "ほす"
+    ],
+    "meaning": "ほす",
+    "grade": 6,
+    "rare": false
+  },
+  "日": {
+    "readings": [
+      "ニチ",
+      "ジツ",
+      "ひ"
+    ],
+    "meaning": "ひ・たいよう",
+    "grade": 1,
+    "rare": false
+  },
+  "旦": {
+    "readings": [
+      "タン",
+      "ダン",
+      "あさ"
+    ],
+    "meaning": "あさ・夜明け",
+    "grade": null,
+    "rare": false
+  },
+  "早": {
+    "readings": [
+      "ソウ",
+      "はやい"
+    ],
+    "meaning": "はやい",
+    "grade": 1,
+    "rare": false
+  },
+  "明": {
+    "readings": [
+      "メイ",
+      "ミョウ",
+      "あかるい"
+    ],
+    "meaning": "あかるい",
+    "grade": 2,
+    "rare": false
+  },
+  "星": {
+    "readings": [
+      "セイ",
+      "ショウ",
+      "ほし"
+    ],
+    "meaning": "ほし",
+    "grade": 2,
+    "rare": false
+  },
+  "晴": {
+    "readings": [
+      "セイ",
+      "はれる"
+    ],
+    "meaning": "はれる",
+    "grade": 2,
+    "rare": false
+  },
+  "月": {
+    "readings": [
+      "ゲツ",
+      "ガツ",
+      "つき"
+    ],
+    "meaning": "つき",
+    "grade": 1,
+    "rare": false
+  },
+  "木": {
+    "readings": [
+      "モク",
+      "ボク",
+      "き"
+    ],
+    "meaning": "き",
+    "grade": 1,
+    "rare": false
+  },
+  "本": {
+    "readings": [
+      "ホン",
+      "もと"
+    ],
+    "meaning": "もと・書物",
+    "grade": 1,
+    "rare": false
+  },
+  "火": {
+    "readings": [
+      "カ",
+      "ひ"
+    ],
+    "meaning": "ひ・ほのお",
+    "grade": 1,
+    "rare": false
+  },
+  "牛": {
+    "readings": [
+      "ギュウ",
+      "うし"
+    ],
+    "meaning": "うし",
+    "grade": 2,
+    "rare": false
+  },
+  "生": {
+    "readings": [
+      "セイ",
+      "ショウ",
+      "いきる"
+    ],
+    "meaning": "いきる・うまれる",
+    "grade": 1,
+    "rare": false
+  },
+  "禾": {
+    "readings": [
+      "カ",
+      "いね"
+    ],
+    "meaning": "いね",
+    "grade": null,
+    "rare": true
+  },
+  "秋": {
+    "readings": [
+      "シュウ",
+      "あき"
+    ],
+    "meaning": "あき",
+    "grade": 2,
+    "rare": false
+  },
+  "青": {
+    "readings": [
+      "セイ",
+      "ショウ",
+      "あお"
+    ],
+    "meaning": "あお",
+    "grade": 1,
+    "rare": false
+  }
+}

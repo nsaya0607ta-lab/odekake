@@ -781,16 +781,108 @@ test("12. 正解の変更でクリア・完成した旧セーブも、報酬は�
 });
 
 test("12. 既存3問のIDを維持し、10ステージクリアの実績を実際に達成できる", () => {
-  assert.equal(STAGES.length, 10);
+  assert.equal(STAGES.length, 16);
   assert.deepEqual(STAGES.slice(0, 3).map((s) => s.id), ["s001-kan", "s002-kan", "s003-shou"]);
   let save = P.defaultSave();
-  for (const stage of STAGES) {
+  for (const stage of STAGES.slice(0, 10)) {
     let round = E.newRound(stage, 0);
     for (const a of E.mainAnswers(stage)) round = E.submit(stage, round, a.strokeSets[0], 1).round;
     save = P.completeStage(P.saveRound(save, round), stage, round, 2).save;
   }
   assert.equal(P.clearedStageCount(save), 10);
   assert.ok(save.achievements.clear_10);
+});
+
+
+// ---------- 13. ステージ11〜16：新6問 ----------
+const MORE = {
+  休: ["一十木人大八", "什"],
+  体: ["一二十木本人大八休仁", "什"],
+  早: ["一二三十口日干丁", "旦"],
+  星: ["一二三十口日生土牛", "旦"],
+  秋: ["一十千木火人八", "禾卜"],
+  晴: ["一二三十口日青月土明", "吐叶"],
+};
+for (const [char, [main, secret]] of Object.entries(MORE)) {
+  const stage = STAGES.find((s) => s.kanji === char);
+  test(`13. 「${char}」の全候補・全${(1 << stage.strokes.length) - 1}組は一字だけ正解になる`, () => {
+    assert.deepEqual(E.mainAnswers(stage).map((a) => a.char).sort(), [...main].sort());
+    assert.deepEqual(E.secretAnswers(stage).map((a) => a.char).sort(), [...secret].sort());
+    const registered = new Map();
+    for (const a of stage.answers) for (const ids of a.strokeSets) {
+      const key = [...ids].sort((a,b) => a-b).join(",");
+      assert.ok(!registered.has(key), `${char} [${key}] の正解が重複しない`);
+      registered.set(key, a.char);
+    }
+    for (let mask = 1; mask < 1 << stage.strokes.length; mask++) {
+      const ids = stage.strokes.filter((_, i) => mask & (1 << i)).map((stroke) => stroke.id);
+      const expected = registered.get([...ids].sort((a,b) => a-b).join(","));
+      const result = J.judgeStrokes(stage, ids, new Set());
+      if (!expected) assert.notEqual(result.kind, "correct", `${char} [${ids}] は未登録`);
+      else {
+        assert.equal(result.kind, "correct");
+        assert.equal(result.answer.char, expected);
+        assert.deepEqual(result.answers.map((a) => a.char), [expected]);
+      }
+    }
+  });
+  test(`13. 「${char}」は通常クリア・報酬・保存再開・全発見まで遊べる`, () => {
+    let save = P.defaultSave();
+    let round = E.newRound(stage, 0);
+    for (const a of E.mainAnswers(stage)) round = E.submit(stage, round, a.strokeSets[0], 1).round;
+    assert.equal(round.clearedAt, 1);
+    assert.equal(round.completedAt, null, "シークレットを残して続けられる");
+    const cleared = P.completeStage(P.saveRound(save, round), stage, round, 2);
+    assert.ok(cleared.reward);
+    const store = P.createKeyValueStore(memoryStorage());
+    store.save(cleared.save);
+    save = store.load();
+    for (const a of E.secretAnswers(stage)) {
+      const before = save.rounds[stage.id];
+      const out = E.submit(stage, before, a.strokeSets[0], 3);
+      assert.equal(out.result.kind, "correct");
+      round = out.round;
+      save = P.saveRound(save, round);
+      const reward = P.recordSecret(save, stage, a.char, out.gained.points, true, 3);
+      assert.equal(reward.coins, P.SECRET_COINS);
+      save = reward.save;
+      assert.equal(P.recordSecret(save, stage, a.char, out.gained.points, true, 4).coins, 0);
+      store.save(save);
+      save = store.load();
+    }
+    assert.equal(round.completedAt, 3);
+    assert.deepEqual(sorted(round.found), sorted([...main, ...secret]));
+    assert.equal(P.completeStage(save, stage, round, 4).reward, null);
+    assert.equal(E.submit(stage, round, [1], 5).round, round, "完成後の連打で状態を変えない");
+  });
+}
+test("13. 人／入・牛／午・土／士を字形で区別し、日／曰も重複しない", () => {
+  for (const [char, ids, expected] of [["休",[5,6],"人"],["体",[5,6],"人"],["早",[4,5,6],"干"],["星",[5,6,7,8],"牛"],["星",[6,7,9],"土"],["晴",[5,6,8],"土"]]) {
+    const stage = STAGES.find((s) => s.kanji === char);
+    const out = E.submit(stage, E.newRound(stage, 0), ids, 1);
+    assert.deepEqual(out.round.found, [expected]);
+    assert.equal(out.gained.discoveries.length, 1);
+  }
+  for (const char of Object.keys(MORE)) {
+    const stage = STAGES.find((s) => s.kanji === char);
+    assert.ok(!stage.answers.some((a) => ["曰","入","士","午"].includes(a.char)));
+  }
+  assert.equal(KYOIKU_GRADES["仁"], 6);
+  assert.equal(KYOIKU_GRADES["干"], 6);
+  assert.equal(KYOIKU_GRADES["吐"], undefined, "吐は教育漢字に含めない");
+});
+test("13. 既存10問のIDとセーブは保ち、新6問を続けて遊べる", () => {
+  assert.deepEqual(STAGES.slice(0,10).map((s) => s.id), ["s001-kan","s002-kan","s003-shou","s004-mori","s005-mei","s006-shi","s007-sou","s008-i","s009-go","s010-sha"]);
+  assert.deepEqual(STAGES.slice(10).map((s) => s.number), [11,12,13,14,15,16]);
+  const first = E.submit(kan, E.newRound(kan,0), setOf("口"),1).round;
+  const save = P.saveRound({ ...P.defaultSave(), coins:321 }, first);
+  const stage = STAGES[10];
+  const added = P.saveRound(save, E.submit(stage, E.newRound(stage,2), stage.answers[0].strokeSets[0],3).round);
+  assert.deepEqual(added.rounds[kan.id], first);
+  assert.equal(added.coins,321);
+  const store = P.createKeyValueStore(memoryStorage());
+  store.save(added);
+  assert.deepEqual(store.load(),added);
 });
 
 console.log(`\n${passed} tests passed`);
