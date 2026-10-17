@@ -1242,6 +1242,34 @@ const STAGE_DATA: Omit<Stage, "strokes">[] = [
         }
       },
       {
+        "char": "八",
+        "readings": [
+          "ハチ",
+          "やっつ"
+        ],
+        "meaning": "やっつ",
+        "rule": "loose",
+        "strokeSets": [
+          [
+            3,
+            4
+          ],
+          [
+            3,
+            7
+          ]
+        ],
+        "evidence": "木の左払い3画目と、木の右下の点4画目か、寸の点7画目をえらぶよ。2本が離れて左右に開くため、短い画でも八に見立てる。",
+        "tier": 3,
+        "grade": 1,
+        "rare": false,
+        "partHint": "木の左払い3画目と、木の右下の点4画目か、寸の点7画目をえらぶよ。2本が離れて左右に開くため、短い画でも八に見立てる。",
+        "verification": {
+          "status": "verified",
+          "note": "八の見立て：右の画が短い点でも、2本が接せず左右に開くことと、上下の位置が重なることを原図で確認。"
+        }
+      },
+      {
         "char": "卜",
         "readings": [
           "ボク",
@@ -1295,7 +1323,7 @@ const STAGE_DATA: Omit<Stage, "strokes">[] = [
     "verification": {
       "status": "verified",
       "checkedOn": "2026-10-17",
-      "note": "KanjiVGの筆画図と抽出した線の形・接続・位置を照合。読み・学年はKANJIDIC2。全候補と除外理由は docs/kakure-kanji-answers-017-024.md。同じ筆画の組の正解は一字だけ。"
+      "note": "KanjiVGの筆画図と抽出した線の形・接続・位置を照合。読み・学年はKANJIDIC2。全候補と除外理由は docs/kakure-kanji-answers-017-024.md。同じ筆画の組の正解は一字だけ。 八は短い右下の画を含む、離れて左右に開く組を登録。"
     }
   },
   {

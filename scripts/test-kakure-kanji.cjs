@@ -533,7 +533,7 @@ test("10. どの結果にも画面に出す文があり、undefined が出ない
 // ---------- 11. 追加ステージ「漢」「称」 ----------
 const additions = [
   { char: "漢", main: ["一", "二", "三", "十", "口", "人", "大", "夫"], secret: ["汁"] },
-  { char: "称", main: ["一", "十", "千", "木", "小", "丁", "下"], secret: ["禾", "卜"] },
+  { char: "称", main: ["一", "十", "千", "木", "八", "小", "丁", "下"], secret: ["禾", "卜"] },
 ];
 
 for (const { char, main, secret } of additions) {
@@ -590,7 +590,7 @@ test("11. 「漢」の横画は二が6通り・三が4通りで、天とは区�
   assert.ok(!stage.answers.some((a) => ["天", "中", "八", "氵", "艹"].includes(a.char)));
 });
 
-test("11. 「称」は5画目を点とし、卜・丁・下・小を認めて八にはしない", () => {
+test("11. 「称」は点を含む八3通りと卜・丁・下・小を認める", () => {
   const stage = STAGES.find((s) => s.kanji === "称");
   const answer = (ids) => J.judgeStrokes(stage, ids, new Set()).answer.char;
   assert.equal(stage.strokes[6].kind, "横");
@@ -600,8 +600,8 @@ test("11. 「称」は5画目を点とし、卜・丁・下・小を認めて八
   assert.equal(answer([8, 9, 10]), "小");
   assert.equal(stage.strokes[4].kind, "点");
   assert.equal(answer([3, 5]), "卜");
-  assert.equal(J.judgeStrokes(stage, [4, 5], new Set()).kind, "wrong");
-  assert.ok(!stage.answers.some((a) => ["二", "人", "八", "少", "不"].includes(a.char)));
+  for (const ids of [[4, 5], [4, 10], [9, 10]]) assert.equal(answer(ids), "八");
+  assert.ok(!stage.answers.some((a) => ["二", "人", "少", "不"].includes(a.char)));
   for (const [kanji, ids] of [["称", [3, 5]], ["秋", [3, 5]], ["想", [2, 4]], ["森", [6, 8]], ["村", [2, 4]]]) {
     const s = STAGES.find((s) => s.kanji === kanji);
     assert.deepEqual(ids.map((id) => s.strokes.find((p) => p.id === id).kind), ["縦", "点"], `${kanji}の卜`);
@@ -614,10 +614,10 @@ const SEVEN = {
   森: ["一二十木林人八", "卜"],
   明: ["一二口日月", ""],
   思: ["一二十口日田心士志", ""],
-  想: ["一二三十木口日目心相旧", "卜"],
+  想: ["一二三十木口日目心相旧八", "卜"],
   意: ["一二三口日立音心", "咅"],
   語: ["一二三口言五工丁", "吾訂訌唔"],
-  謝: ["一二三十口言寸身射討計", ""],
+  謝: ["一二三十口言寸身射討計八", ""],
 };
 
 for (const [char, [main, secret]] of Object.entries(SEVEN)) {
@@ -895,7 +895,7 @@ const FURTHER = {
   苗: ["一二三十口日田士", ""],
   男: ["一二十口日田士力", "另"],
   町: ["一二十口日田士丁", "叮"],
-  村: ["一十木寸", "卜"],
+  村: ["一十木寸八", "卜"],
   困: ["一二十口木人", "囚"],
   湖: ["一二十口古月", "胡汁沽"],
 };
@@ -1055,6 +1055,44 @@ test("15. 全24問の土・士は、選択した実際の横画の長短に合�
       };
       assert.equal(width(horizontals[0]) > width(horizontals[1]) ? "士" : "土", answer.char, `${stage.kanji} [${ids}]`);
     }
+  }
+});
+
+test("16. 八は短い右の画を含め15組を認め、別の取り方でも一度だけ見つかる", () => {
+  const expected = {感:[[2,7]],称:[[4,5],[4,10],[9,10]],森:[[7,8],[7,12]],想:[[3,4]],謝:[[14,17]],休:[[1,6]],体:[[1,6]],秋:[[4,5],[4,6],[4,9]],村:[[3,4],[3,7]]};
+  const sample = (stroke) => {
+    const tokens = stroke.d.match(/[MCL]|-?\d+(?:\.\d+)?/g);let at=[0,0],i=0;const points=[];
+    const point=()=>[Number(tokens[i++]),Number(tokens[i++])];
+    while(i<tokens.length){
+      const op=tokens[i++];
+      if(op==="M"){at=point();points.push(at);}
+      else if(op==="L"){
+        const end=point(),start=at,n=Math.ceil(Math.hypot(end[0]-start[0],end[1]-start[1])*5);
+        for(let j=1;j<=n;j++)points.push([start[0]+(end[0]-start[0])*j/n,start[1]+(end[1]-start[1])*j/n]);at=end;
+      }else if(op==="C"){
+        const a=at,b=point(),c=point(),d=point(),n=Math.ceil((Math.hypot(b[0]-a[0],b[1]-a[1])+Math.hypot(c[0]-b[0],c[1]-b[1])+Math.hypot(d[0]-c[0],d[1]-c[1]))*5);
+        for(let j=1;j<=n;j++){const t=j/n;points.push([0,1].map(k=>(1-t)**3*a[k]+3*(1-t)**2*t*b[k]+3*(1-t)*t*t*c[k]+t**3*d[k]));}at=d;
+      }else throw new Error(`未対応の筆画 ${op}`);
+    }
+    return points;
+  };
+  assert.equal(STAGES.filter(s=>s.answers.some(a=>a.char==="八")).length,Object.keys(expected).length);
+  for(const [kanji,sets] of Object.entries(expected)){
+    const stage=STAGES.find(s=>s.kanji===kanji),answer=stage.answers.find(a=>a.char==="八");assert.deepEqual(answer.strokeSets,sets);
+    for(const ids of sets){
+      const [l,r]=ids.map(id=>stage.strokes.find(s=>s.id===id)),lp=sample(l),rp=sample(r);
+      assert.ok(lp.at(-1)[0]<lp[0][0]&&lp.at(-1)[1]>lp[0][1],`${kanji}の左は左下へ`);
+      assert.ok(rp.at(-1)[0]>rp[0][0]&&rp.at(-1)[1]>rp[0][1],`${kanji}の右は右下へ`);
+      assert.ok(Math.max(...lp.map(p=>p[0]))<Math.min(...rp.map(p=>p[0])),`${kanji}の左右の位置`);
+      let distance=Infinity;for(const a of lp)for(const b of rp)distance=Math.min(distance,Math.hypot(a[0]-b[0],a[1]-b[1]));
+      assert.ok(distance>(l.width??5.2)/2+(r.width??5.2)/2,`${kanji} [${ids}] の2本は接しない`);
+      const out=E.submit(stage,E.newRound(stage,0),ids,1);assert.deepEqual(out.round.found,["八"]);assert.equal(out.gained.discoveries.length,1);
+      for(const another of sets){const duplicate=E.submit(stage,out.round,another,2);assert.equal(duplicate.result.kind,"duplicate");assert.equal(duplicate.round.score,out.round.score);}
+    }
+  }
+  // 点を八の見立てに使っても、くっつく人や交わる乂を同じ組の八にはしない。
+  for(const [kanji,ids] of [["漢",[12,13]],["森",[3,4]],["森",[11,12]],["休",[5,6]],["体",[5,6]],["秋",[8,9]],["困",[5,6]],["感",[7,8]]]){
+    const stage=STAGES.find(s=>s.kanji===kanji);assert.notEqual(J.judgeStrokes(stage,ids,new Set()).answer.char,"八");
   }
 });
 

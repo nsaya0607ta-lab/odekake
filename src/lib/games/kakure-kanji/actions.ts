@@ -53,9 +53,16 @@ export function applyKanjiAction(stored: SaveData | null, balance: number, actio
           save = saveRound(save, outcome.round);
           const recorded = recordAnswers(save, outcome.gained ? 1 : 0, ["wrong", "whole"].includes(outcome.result.kind) ? 1 : 0, now);
           save = recorded.save; event.unlocked = [...recorded.unlocked]; event.secretCoins = 0;
+          // 正解追加で報酬済みラウンドを再開した場合、追加の通常字の点数も記録する。
+          const paidRecord = save.stages[stage.id];
+          if (outcome.gained && !outcome.gained.secret && live.rewardedAt !== null && paidRecord) {
+            save = { ...save, totalPoints: save.totalPoints + outcome.gained.points, stages: {
+              ...save.stages, [stage.id]: { ...paidRecord, bestScore: Math.max(paidRecord.bestScore, outcome.round.score) },
+            } };
+          }
           for (const discovery of outcome.gained?.discoveries ?? []) {
             if (!discovery.secret) continue;
-            const secret = recordSecret(save, stage, discovery.answer.char, discovery.points, live.clearedAt !== null, now);
+            const secret = recordSecret(save, stage, discovery.answer.char, discovery.points, live.rewardedAt !== null, now);
             save = secret.save; event.secretCoins += secret.coins; event.unlocked.push(...secret.achievements);
           }
           if (outcome.cleared) {
