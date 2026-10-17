@@ -5,13 +5,14 @@ import { STAGE_003_SHOU } from "./stage-003-shou";
 import { STAGES_004_010 } from "./stages-004-010";
 import { STAGES_011_016 } from "./stages-011-016";
 import { STAGES_017_024 } from "./stages-017-024";
+import { STAGES_025_026 } from "./stages-025-026";
 
 /**
  * 遊べるステージの一覧（並び順＝ステージ番号順）。
  * 新しい問題は data/stage-XXX-*.ts を作ってここに足す。手順は docs/kakure-kanji.md。
  * verification.status が "verified" でない問題は一覧に出さない。
  */
-const ALL_STAGES: Stage[] = [STAGE_001_KAN, STAGE_002_KAN, STAGE_003_SHOU, ...STAGES_004_010, ...STAGES_011_016, ...STAGES_017_024];
+const ALL_STAGES: Stage[] = [STAGE_001_KAN, STAGE_002_KAN, STAGE_003_SHOU, ...STAGES_004_010, ...STAGES_011_016, ...STAGES_017_024, ...STAGES_025_026];
 
 export const STAGES: Stage[] = ALL_STAGES.filter((stage) => stage.verification.status === "verified");
 

@@ -6,6 +6,7 @@
 import characterInfo from "./character-info-004-010.json";
 import moreCharacterInfo from "./character-info-011-016.json";
 import furtherCharacterInfo from "./character-info-017-024.json";
+import newCharacterInfo from "./character-info-025-026.json";
 
 export const KYOIKU_GRADES: Record<string, 1 | 2 | 3 | 4 | 5 | 6> = {
   一: 1, 口: 1, 二: 1, 三: 1, 七: 1, 八: 1, 十: 1, 日: 1, 小: 1, 人: 1,
@@ -22,4 +23,5 @@ export const KYOIKU_GRADES: Record<string, 1 | 2 | 3 | 4 | 5 | 6> = {
   ...Object.fromEntries(Object.entries(furtherCharacterInfo)
     .filter(([, info]) => info.grade !== null)
     .map(([char, info]) => [char, info.grade as 1 | 2 | 3 | 4 | 5 | 6])),
+  ...Object.fromEntries(Object.entries(newCharacterInfo).filter(([, info]) => info.grade !== null).map(([char, info]) => [char, info.grade as 1 | 2 | 3 | 4 | 5 | 6])),
 };

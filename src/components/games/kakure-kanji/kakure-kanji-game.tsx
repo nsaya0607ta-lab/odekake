@@ -146,7 +146,7 @@ export function KakureKanjiGame({ userId }: { userId: string }) {
             青コインはアプリ共通です。ヒントに使ったり、家具やガチャにも使えます。記録はアカウントに保存されます。効果音はアプリの「タップ音」の音量に合わせています。
           </p>
           <p className={styles.note}>
-            ステージ4〜24の筆画：<a href="https://kanjivg.tagaini.net/" target="_blank" rel="noreferrer">KanjiVG</a>
+            ステージ4〜26の筆画：<a href="https://kanjivg.tagaini.net/" target="_blank" rel="noreferrer">KanjiVG</a>
             {" "}（CC BY-SA 3.0）。<a href="/licenses/kakure-kanji/README.txt" target="_blank" rel="noreferrer">出典・変更内容・原図とライセンス</a>
           </p>
         </Sheet>

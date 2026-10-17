@@ -784,7 +784,7 @@ test("12. 正解の変更でクリア・完成した旧セーブも、報酬は�
 });
 
 test("12. 既存3問のIDを維持し、10ステージクリアの実績を実際に達成できる", () => {
-  assert.equal(STAGES.length, 24);
+  assert.equal(STAGES.length, 26);
   assert.deepEqual(STAGES.slice(0, 3).map((s) => s.id), ["s001-kan", "s002-kan", "s003-shou"]);
   let save = P.defaultSave();
   for (const stage of STAGES.slice(0, 10)) {
@@ -991,10 +991,10 @@ test("14. 士／土・人／入・力／刀は実際の形で一字に決まり�
   assert.equal(KYOIKU_GRADES["因"], 5);
   assert.equal(KYOIKU_GRADES["寸"], 6);
 });
-test("14. 既存16問のID・セーブを保ち、全24問を連番で公開する", () => {
+test("14. 既存16問のID・セーブを保ち、全26問を連番で公開する", () => {
   assert.deepEqual(STAGES.slice(0,16).map((s) => s.id), ["s001-kan","s002-kan","s003-shou","s004-mori","s005-mei","s006-shi","s007-sou","s008-i","s009-go","s010-sha","s011-kyuu","s012-tai","s013-sou","s014-hoshi","s015-aki","s016-hare"]);
-  assert.deepEqual(STAGES.map((s) => s.number), Array.from({length:24}, (_,i) => i+1));
-  assert.deepEqual(STAGES.slice(16).map((s) => s.kanji), Object.keys(FURTHER));
+  assert.deepEqual(STAGES.map((s) => s.number), Array.from({length:26}, (_,i) => i+1));
+  assert.deepEqual(STAGES.slice(16,24).map((s) => s.kanji), Object.keys(FURTHER));
   let save = { ...P.defaultSave(), coins:321 };
   for (const stage of STAGES.slice(0,16)) save = P.saveRound(save, E.submit(stage, E.newRound(stage,0), stage.answers[0].strokeSets[0],1).round);
   const previous = structuredClone(save.rounds);
@@ -1076,7 +1076,7 @@ test("16. 八は短い右の画を含め15組を認め、別の取り方でも�
     }
     return points;
   };
-  assert.equal(STAGES.filter(s=>s.answers.some(a=>a.char==="八")).length,Object.keys(expected).length);
+  assert.equal(STAGES.slice(0,24).filter(s=>s.answers.some(a=>a.char==="八")).length,Object.keys(expected).length);
   for(const [kanji,sets] of Object.entries(expected)){
     const stage=STAGES.find(s=>s.kanji===kanji),answer=stage.answers.find(a=>a.char==="八");assert.deepEqual(answer.strokeSets,sets);
     for(const ids of sets){
@@ -1095,5 +1095,33 @@ test("16. 八は短い右の画を含め15組を認め、別の取り方でも�
     const stage=STAGES.find(s=>s.kanji===kanji);assert.notEqual(J.judgeStrokes(stage,ids,new Set()).answer.char,"八");
   }
 });
+
+for (const [char, count, secrets, rejected] of [["産", 9, 3, ["王", "干", "午", "士"]], ["額", 13, 6, ["見", "曰", "名", "宀", "夂"]]]) {
+  const stage = STAGES.find(s => s.kanji === char);
+  test(`17. ${char}の全筆画選択を照合し、通常${count}字・シークレット${secrets}字だけを受け付ける`, () => {
+    assert.equal(E.mainAnswers(stage).length, count); assert.equal(E.secretAnswers(stage).length, secrets);
+    for (const c of rejected) assert.ok(!stage.answers.some(a => a.char === c));
+    const registered = new Map();
+    for (const a of stage.answers) for (const ids of a.strokeSets) {
+      const key = [...ids].sort((a,b)=>a-b).join(","); assert.ok(!registered.has(key)); registered.set(key, a.char);
+    }
+    for (let mask=1; mask < 2 ** stage.strokes.length; mask++) {
+      const ids = stage.strokes.filter((_,i)=>mask & (1<<i)).map(s=>s.id), expected = registered.get(ids.join(","));
+      const result = J.judgeStrokes(stage, ids, new Set());
+      assert.equal(result.kind === "correct", !!expected, `${char} [${ids}]`);
+      if (expected) assert.equal(result.answer.char, expected);
+    }
+    let round = E.newRound(stage, 0);
+    for (const a of [...E.mainAnswers(stage), ...E.secretAnswers(stage)]) {
+      round = E.submit(stage, round, a.strokeSets[0], 1).round;
+      for (const ids of a.strokeSets.slice(1)) {
+        const before = round.score; const duplicate = E.submit(stage, round, ids, 2); assert.equal(duplicate.round.score, before);
+      }
+    }
+    assert.notEqual(round.clearedAt, null); assert.notEqual(round.completedAt, null);
+    const save = P.saveRound(P.defaultSave(), round);
+    assert.deepEqual(P.reconcileSave(save, STAGES, 3).rounds[stage.id].found, round.found);
+  });
+}
 
 console.log(`\n${passed} tests passed`);
