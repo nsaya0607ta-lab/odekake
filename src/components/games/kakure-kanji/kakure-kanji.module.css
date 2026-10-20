@@ -1011,6 +1011,51 @@
   color: var(--ink-faint);
   font-weight: 800;
 }
+.folderGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 14px;
+}
+.folderCard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  padding: 16px 10px;
+  border: 1px solid var(--card-edge);
+  border-radius: 18px;
+  background: var(--card);
+  box-shadow: var(--tile-shadow);
+  cursor: pointer;
+}
+.folderCard:active {
+  transform: translateY(2px);
+}
+.folderIcon {
+  font-size: 30px;
+  line-height: 1.2;
+}
+.folderCard strong {
+  font-size: 20px;
+  font-weight: 900;
+}
+.folderMeta {
+  color: var(--ink-soft);
+  font-size: 11px;
+  font-weight: 800;
+}
+.folderKanji {
+  color: var(--ai);
+  font-size: 18px;
+  overflow-wrap: anywhere;
+}
+.stageList {
+  display: grid;
+  gap: 10px;
+  padding-top: 8px;
+}
 .stageCard {
   width: 100%;
   display: grid;
