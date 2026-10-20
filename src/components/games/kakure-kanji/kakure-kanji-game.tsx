@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { STAGES, findStage } from "@/lib/games/kakure-kanji/data/index";
-import type { Difficulty, Stage } from "@/lib/games/kakure-kanji/types";
+import type { Stage } from "@/lib/games/kakure-kanji/types";
 import { mainAnswers, secretAnswers } from "@/lib/games/kakure-kanji/engine";
 import {
   ACHIEVEMENTS,
@@ -24,13 +24,9 @@ import { useKanjiAccount } from "./use-kanji-account";
 type Screen = { name: "home" } | { name: "stages" } | { name: "play"; stageId: string } | { name: "review"; stageId: string; skipped: boolean };
 type Overlay = "settings" | "achievements" | "howto" | null;
 
-const DIFFICULTIES: { id: Difficulty; note: string }[] = [
-  { id: "初級", note: "2〜3個の漢字を見つける" },
-  { id: "中級", note: "4〜6個の漢字を見つける" },
-  { id: "上級", note: "7〜10個の漢字を見つける" },
-  { id: "超上級", note: "複雑なつくりの漢字" },
-  { id: "達人", note: "見つけにくい漢字がまじる" },
-];
+const STAGE_FOLDERS = [...new Set(STAGES.map((stage) => stage.strokes.length))]
+  .sort((a, b) => a - b)
+  .map((strokeCount) => ({ strokeCount, stages: STAGES.filter((stage) => stage.strokes.length === strokeCount) }));
 
 export function KakureKanjiGame({ userId }: { userId: string }) {
   const rootRef = useRef<HTMLDivElement>(null);
@@ -38,6 +34,7 @@ export function KakureKanjiGame({ userId }: { userId: string }) {
 
   const { save, busy, error, act, retry } = useKanjiAccount(userId);
   const [screen, setScreen] = useState<Screen>({ name: "home" });
+  const [selectedStrokeCount, setSelectedStrokeCount] = useState<number | null>(null);
   const [overlay, setOverlay] = useState<Overlay>(null);
   const [toast, setToast] = useState<{ text: string; key: number } | null>(null);
   const [systemDark, setSystemDark] = useState(false);
@@ -75,7 +72,10 @@ export function KakureKanjiGame({ userId }: { userId: string }) {
 
   /** ステージを開く。シークレットまで全部見つけたラウンドは終わっているので、新しく始める */
   const startStage = async (id: string) => {
-    if (await act({ type: "start", stageId: id })) setScreen({ name: "play", stageId: id });
+    if (await act({ type: "start", stageId: id })) {
+      setSelectedStrokeCount(findStage(id)?.strokes.length ?? null);
+      setScreen({ name: "play", stageId: id });
+    }
   };
 
   return (
@@ -104,6 +104,8 @@ export function KakureKanjiGame({ userId }: { userId: string }) {
       ) : screen.name === "stages" ? (
         <StagesScreen
           save={save}
+          strokeCount={selectedStrokeCount}
+          onFolder={setSelectedStrokeCount}
           onBack={() => setScreen({ name: "home" })}
           onPlay={(id) => {
             playSfx("tap", save.settings.sound);
@@ -112,7 +114,10 @@ export function KakureKanjiGame({ userId }: { userId: string }) {
           onReview={(id) => setScreen({ name: "review", stageId: id, skipped: false })}
         />
       ) : (
-        <HomeScreen save={save} onStart={startStage} onStages={() => setScreen({ name: "stages" })} onOverlay={setOverlay} />
+        <HomeScreen save={save} onStart={startStage} onStages={() => {
+          setSelectedStrokeCount(null);
+          setScreen({ name: "stages" });
+        }} onOverlay={setOverlay} />
       )}
 
       {overlay === "settings" && save && (
@@ -286,7 +291,7 @@ function HomeScreen({
           )}
           <div className={styles.menuGrid}>
             <button type="button" className={styles.menuItem} onClick={onStages}>
-              <span aria-hidden="true">📜</span>ステージ
+              <span aria-hidden="true">📁</span>漢字をえらぶ
             </button>
             <button type="button" className={styles.menuItem} onClick={() => onOverlay("achievements")}>
               <span aria-hidden="true">🏅</span>実績
@@ -318,40 +323,53 @@ function homeLabel(stage: Stage, save: SaveData): string {
   return save.stages[stage.id]?.clears ? "もう一度あそぶ" : "あそぶ";
 }
 
-function StagesScreen({ save, onBack, onPlay, onReview }: { save: SaveData; onBack: () => void; onPlay: (id: string) => void; onReview: (id: string) => void }) {
+function StagesScreen({ save, strokeCount, onFolder, onBack, onPlay, onReview }: {
+  save: SaveData;
+  strokeCount: number | null;
+  onFolder: (strokeCount: number | null) => void;
+  onBack: () => void;
+  onPlay: (id: string) => void;
+  onReview: (id: string) => void;
+}) {
+  const folder = STAGE_FOLDERS.find((item) => item.strokeCount === strokeCount);
   return (
     <>
       <header className={styles.topbar}>
-        <button type="button" className={styles.iconButton} onClick={onBack} aria-label="もどる">
+        <button type="button" className={styles.iconButton} onClick={() => folder ? onFolder(null) : onBack()} aria-label={folder ? "画数フォルダへもどる" : "ホームへもどる"}>
           ‹
         </button>
         <div className={styles.stageMeta}>
-          <small>STAGES</small>
-          <strong>ステージをえらぶ</strong>
+          <small>{folder ? `${folder.stages.length}字` : `${STAGES.length}字`}</small>
+          <strong>{folder ? `${folder.strokeCount}画の漢字` : "画数フォルダ"}</strong>
         </div>
         <CoinPill coins={save.coins} />
       </header>
-      <main className={styles.home}>
+      <main key={strokeCount ?? "folders"} className={styles.home}>
         <div className={styles.column}>
-          {DIFFICULTIES.map((d) => {
-            const list = STAGES.filter((s) => s.difficulty === d.id);
-            return (
-              <section key={d.id} aria-label={d.id}>
-                <h2 className={styles.levelHead}>
-                  {d.id} <small>{d.note}</small>
-                </h2>
-                {list.length === 0 ? (
-                  <p className={styles.emptyStage}>準備中（答えを確かめた問題から追加します）</p>
-                ) : (
-                  <div style={{ display: "grid", gap: 8 }}>
-                    {list.map((stage) => (
-                      <StageCard key={stage.id} stage={stage} save={save} onPlay={onPlay} onReview={onReview} />
-                    ))}
-                  </div>
-                )}
-              </section>
-            );
-          })}
+          {folder ? (
+            <div className={styles.stageList} aria-label={`${folder.strokeCount}画の漢字一覧`}>
+              {folder.stages.map((stage) => (
+                <StageCard key={stage.id} stage={stage} save={save} onPlay={onPlay} onReview={onReview} />
+              ))}
+            </div>
+          ) : (
+            <>
+              <p className={styles.note}>画数のフォルダを開いて、あそぶ漢字をえらぼう。</p>
+              <div className={styles.folderGrid} aria-label="画数別フォルダ">
+                {STAGE_FOLDERS.map(({ strokeCount: count, stages }) => {
+                  const cleared = stages.filter((stage) => save.stages[stage.id]?.clears).length;
+                  return (
+                    <button key={count} type="button" className={styles.folderCard} onClick={() => onFolder(count)} aria-label={`${count}画のフォルダ、${stages.length}字、${cleared}字クリア`}>
+                      <span className={styles.folderIcon} aria-hidden="true">📁</span>
+                      <strong>{count}画</strong>
+                      <span className={styles.folderMeta}>{stages.length}字 ・ クリア {cleared}/{stages.length}</span>
+                      <span className={`${styles.folderKanji} ${styles.mincho}`} aria-hidden="true">{stages.map((stage) => stage.kanji).join(" ")}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </>
+          )}
         </div>
       </main>
     </>
