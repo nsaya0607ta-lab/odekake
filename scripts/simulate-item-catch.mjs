@@ -11,7 +11,7 @@
  * 正規表現+evalでLVテーブル・出現重み・？アイテムの抽選プール・ROUND_SECONDS等を抽出するため、
  * 実装側の数値を変更すればこのスクリプトも自動的に追従する（値を二重管理しない）。
  *
- * 使い方: node scripts/simulate-item-catch.mjs [試行回数(デフォルト300)] [avoid|all] [時間増加系8種の実キャッチ率(デフォルト0.8)] [通常時キャッチ率(デフォルト0.85)] [密集時キャッチ率(デフォルト0.5)]
+ * 使い方: node scripts/simulate-item-catch.mjs [試行回数(デフォルト300)] [avoid|all] [時間増加系8種の実キャッチ率(デフォルト0.8)] [通常時キャッチ率(デフォルト0.85)] [密集時キャッチ率(デフォルト0.5)] [ダンボールNo.11のLv(デフォルト0=未装備)]
  *   第2引数 "avoid"（デフォルト）: 時間減少ハザードとチョコレートは回避する（キャッチしない）前提
  *   第2引数 "all": ハザードも含めて全てのスポーンを100%キャッチする前提
  *     （時間減少は-3秒、チョコレートは即座にラウンド終了）
@@ -24,6 +24,10 @@
  *   第5引数: フレブル大量出現(dogFlood)・うんち祭り(poopFlood)・フルーツバスケット/Clawd(personFlood/clawdFlood)・
  *     出現量アップ中など、複数アイテムがほぼ同時に降ってくる「密集時」に適用されるキャッチ率。段ボールは1つしかなく
  *     同時に複数はキャッチできないため、通常時より大幅に低い値を想定する。
+ *   第6引数: ダンボールNo.11「全アイテムのスキルLv上昇」を装備している場合の、そのダンボール自身のLv(1〜5)。
+ *     デフォルト0（未装備）。frenchie-catch-game.tsxのdambourleSkillBoostと同じで、全アイテムの発動スキルLvが
+ *     このぶん底上げされる（例: Lv5の人がNo.11のLv5を装備すると、全アイテムがLv10相当で発動する）。
+ *     出現カットオフ秒数の計算には影響しない（実装と同じ）。
  *
  * 既知の簡略化（完全な再現ではない点に注意）:
  * - もっちゅりんの「エコー」（直前に捕まえたアイテムのスキルを再発動）は未実装
@@ -247,7 +251,7 @@ function uniform(min, max) { return min + Math.random() * (max - min); }
 function weightOf(id) { return ITEM_SPAWN_WEIGHTS[id] ?? DEFAULT_WEIGHT; }
 function clamp1to5(x) { return Math.min(5, Math.max(1, x)); }
 
-function simulateOneRound(lv, catchAll, timeBonusCatchRate = 0.8, normalCatchRate = 0.85, denseCatchRate = 0.5) {
+function simulateOneRound(lv, catchAll, timeBonusCatchRate = 0.8, normalCatchRate = 0.85, denseCatchRate = 0.5, dambourleBoost = 0) {
   const timeBonusCutoffMs = (TIME_BONUS_CUTOFF_BASE_SEC + lv * TIME_BONUS_CUTOFF_STEP_SEC_PER_LEVEL) * 1000;
   let t = 0;
   let endAt = ROUND_SECONDS * 1000;
@@ -440,14 +444,17 @@ function simulateOneRound(lv, catchAll, timeBonusCatchRate = 0.8, normalCatchRat
     if (t < okaeriUntil) addBonusTime(okaeriPerCatchValue);
 
     let skillId = itemId;
-    let skillLvIdx = clamp1to5(itemLevel) - 1;
+    // ダンボールNo.11「全アイテムのスキルLv上昇」装備中は、全アイテムの発動スキルLvが
+    // dambourleBoostぶん底上げされる（frenchie-catch-game.tsxのeffectiveSkillLevel/skillLevelCapに対応。
+    // カットオフ秒数(timeBonusCutoffMs)の計算には反映しない点も実装と同じ）
+    let skillLvIdx = clamp1to5(itemLevel) - 1 + dambourleBoost;
     if (itemId === "mystery_item") {
       const mysteryPool = t >= timeBonusCutoffMs ? MYSTERY_SKILL_ITEM_IDS.filter((id) => !REDUCED_CATCH_IDS.has(id)) : MYSTERY_SKILL_ITEM_IDS;
       skillId = mysteryPool[Math.floor(Math.random() * mysteryPool.length)];
-      skillLvIdx = lv; // フルコンプ想定なので？が選んだアイテムも同じLv扱い
+      skillLvIdx = lv + dambourleBoost; // フルコンプ想定なので？が選んだアイテムも同じLv扱い
     }
-    // ナルシストアー有効中は、捕まえた全アイテムのスキルがレベル5(MAX)として発動する
-    if (t < narcissistUntil) skillLvIdx = 4;
+    // ナルシストアー有効中は、捕まえた全アイテムのスキルがレベル5+dambourleBoost(MAX)として発動する
+    if (t < narcissistUntil) skillLvIdx = 4 + dambourleBoost;
     if (skillId) points += runItemSkillEffect(skillId, skillLvIdx);
 
     if (Math.random() < JUST_CHANCE) points = Math.round(points * JUST_MULTIPLIER);
@@ -617,7 +624,9 @@ function main() {
   const timeBonusCatchRate = process.argv[4] !== undefined ? Number(process.argv[4]) : 0.8;
   const normalCatchRate = process.argv[5] !== undefined ? Number(process.argv[5]) : 0.85;
   const denseCatchRate = process.argv[6] !== undefined ? Number(process.argv[6]) : 0.7;
-  console.log(`itemPool N=${POOL_SIZE} / ROUND_SECONDS=${ROUND_SECONDS} / MAX_ROUND_SECONDS=${MAX_PLAY_SECONDS} / 試行回数=${trials} / モード=${mode}${catchAll ? "（時間減少・チョコレートも100%キャッチ）" : "（時間減少・チョコレートは回避）"} / 時間増加系8種の実キャッチ率=${timeBonusCatchRate} / 通常時キャッチ率=${normalCatchRate} / 密集時キャッチ率=${denseCatchRate}`);
+  // ダンボールNo.11「全アイテムのスキルLv上昇」の自身のLv(1〜5)。0=未装備（デフォルト）
+  const dambourleBoost = process.argv[7] !== undefined ? Number(process.argv[7]) : 0;
+  console.log(`itemPool N=${POOL_SIZE} / ROUND_SECONDS=${ROUND_SECONDS} / MAX_ROUND_SECONDS=${MAX_PLAY_SECONDS} / 試行回数=${trials} / モード=${mode}${catchAll ? "（時間減少・チョコレートも100%キャッチ）" : "（時間減少・チョコレートは回避）"} / 時間増加系8種の実キャッチ率=${timeBonusCatchRate} / 通常時キャッチ率=${normalCatchRate} / 密集時キャッチ率=${denseCatchRate}${dambourleBoost > 0 ? ` / ダンボールNo.11 Lv${dambourleBoost}装備（スキルLv上限${5 + dambourleBoost}）` : ""}`);
   console.log(
     `プール重み予算（未充填ランク分はdogへ上乗せして消化）: ` +
     `時間増加系8種=${poolWeightTotal(TIME_BONUS_IDS)}（+未充填${TIME_BONUS_UNFILLED_RANK_DOG_WEIGHT}→dogへ、合計${poolWeightTotal(TIME_BONUS_IDS) + TIME_BONUS_UNFILLED_RANK_DOG_WEIGHT}） / ` +
@@ -629,7 +638,7 @@ function main() {
     const scores = [], secs = [];
     let cappedCount = 0;
     for (let i = 0; i < trials; i++) {
-      const r = simulateOneRound(lvIdx, catchAll, timeBonusCatchRate, normalCatchRate, denseCatchRate);
+      const r = simulateOneRound(lvIdx, catchAll, timeBonusCatchRate, normalCatchRate, denseCatchRate, dambourleBoost);
       scores.push(r.score);
       secs.push(r.playSeconds);
       if (r.cappedOut) cappedCount += 1;
