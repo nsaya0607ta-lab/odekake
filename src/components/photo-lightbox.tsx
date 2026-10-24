@@ -4,27 +4,6 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { IconChevronLeft, IconChevronRight, IconClose } from "@/components/icons";
 
-/** 1枚の写真をタップで元の縦横比のまま拡大表示する */
-export function TappablePhoto({
-  url,
-  alt = "",
-  className,
-}: {
-  url: string;
-  alt?: string;
-  className?: string;
-}) {
-  const [open, setOpen] = useState(false);
-
-  return (
-    <>
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={url} alt={alt} onClick={() => setOpen(true)} className={className} loading="lazy" />
-      {open ? <PhotoLightbox urls={[url]} index={0} onIndexChange={() => {}} onClose={() => setOpen(false)} /> : null}
-    </>
-  );
-}
-
 /**
  * 写真をタップしたときに、元の縦横比のまま全画面で拡大表示する。
  * サムネイルは object-cover で切り抜かれるが、ここでは object-fit: contain のため
