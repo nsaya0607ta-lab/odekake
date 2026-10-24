@@ -8,7 +8,7 @@ import type { DB } from "@/lib/data/client";
 import { toJapaneseError } from "@/lib/errors";
 import { distanceMeters, getMunicipality, municipalityFromAddress, nearestMunicipality } from "@/lib/geo";
 import { MAX_PHOTOS_PER_VISIT } from "@/lib/image";
-import { finalizePhotoPaths } from "@/lib/photos";
+import { copyPhotoPathsTo, finalizePhotoPaths } from "@/lib/photos";
 import { syncVisitTags } from "@/lib/data/tags";
 import { requireUser } from "@/lib/supabase/server";
 import type { LocationSource } from "@/lib/supabase/types";
@@ -98,9 +98,34 @@ const visitedSpotSchema = spotSchema.extend({
 
 type SpotInput = z.infer<typeof spotSchema>;
 
-const existingSpotVisitSchema = z.object({
-  existingSpotId: z.string().uuid("スポットを選んでください。"),
-  visitId: z.string().uuid("保存の準備が完了していません。画面を開き直してください。"),
+const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+const existingSpotsVisitSchema = z.object({
+  existingSpots: z
+    .string()
+    .transform((raw, ctx) => {
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(raw);
+      } catch {
+        parsed = null;
+      }
+      const items = Array.isArray(parsed)
+        ? parsed.flatMap((item) => {
+            if (typeof item !== "object" || item === null) return [];
+            const spotId = (item as Record<string, unknown>).spotId;
+            const visitId = (item as Record<string, unknown>).visitId;
+            if (typeof spotId !== "string" || typeof visitId !== "string") return [];
+            if (!uuidPattern.test(spotId) || !uuidPattern.test(visitId)) return [];
+            return [{ spotId, visitId }];
+          })
+        : [];
+      if (items.length === 0) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: "スポットを選んでください。" });
+        return z.NEVER;
+      }
+      return items;
+    }),
   tripId: z.string().uuid("旅行を選んでください。"),
   journeyId: z.string().trim().transform((v) => v === "" ? null : v).refine((v) => v === null || /^[0-9a-f-]{36}$/i.test(v), "旅行を選び直してください。"),
   visitedAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "訪問日を入力してください。"),
@@ -130,7 +155,7 @@ type DbError = {
 
 function collect(formData: FormData) {
   return {
-    existingSpotId: String(formData.get("existingSpotId") ?? ""),
+    existingSpots: String(formData.get("existingSpots") ?? "[]"),
     name: String(formData.get("name") ?? ""),
     categoryId: String(formData.get("categoryId") ?? ""),
     municipalityCode: String(formData.get("municipalityCode") ?? ""),
@@ -290,11 +315,16 @@ async function syncPhotos(
   tripId: string,
   visitId: string,
   requestedPaths: string[],
+  /** true の場合、元の一時写真を消さずコピーする（同じ写真を複数の訪問記録に付けるとき用） */
+  copy = false,
 ) {
+  const destinationPrefix = `trips/${tripId}/visits/${visitId}`;
   // 同じ写真が二重に入っていると表示順が重複するため、ここで重複を除く
   const paths = [
     ...new Set(
-      await finalizePhotoPaths(supabase, requestedPaths, `trips/${tripId}/visits/${visitId}`),
+      copy
+        ? await copyPhotoPathsTo(supabase, requestedPaths, destinationPrefix)
+        : await finalizePhotoPaths(supabase, requestedPaths, destinationPrefix),
     ),
   ];
 
@@ -437,72 +467,88 @@ export async function createVisitedSpotAction(_prev: ActionState, formData: Form
 }
 
 /** 登録済みのスポットへ、新しい訪問記録だけを追加する（場所自体は登録し直さない） */
-export async function createVisitForExistingSpotAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+/** 登録済みのスポットへ、新しい訪問記録だけをまとめて追加する（場所自体は登録し直さない） */
+export async function createVisitsForExistingSpotsAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const values = collect(formData);
-  const parsed = existingSpotVisitSchema.safeParse(values);
+  const parsed = existingSpotsVisitSchema.safeParse(values);
 
   if (!parsed.success) {
     return { error: "入力内容をご確認ください。", fieldErrors: fieldErrorsOf(parsed.error), values };
   }
 
   const { supabase, user } = await requireUser();
+  const requested = parsed.data.existingSpots;
 
-  // 二重送信の防止
-  const { data: savedVisit } = await supabase
+  // 二重送信の防止。すでに保存済みの分は除いて、残りだけ追加する。
+  const { data: savedVisits } = await supabase
     .from("visit_records")
     .select("id, spot_id")
-    .eq("id", parsed.data.visitId)
-    .maybeSingle();
-  if (savedVisit) redirect(`/spots/${savedVisit.spot_id}?saved=1&trip=${parsed.data.tripId}`);
+    .in("id", requested.map((item) => item.visitId));
+  const savedIds = new Set((savedVisits ?? []).map((v) => v.id));
+  const pending = requested.filter((item) => !savedIds.has(item.visitId));
 
-  const { data: spot } = await supabase
+  if (pending.length === 0) {
+    redirect(`/trips/${parsed.data.tripId}?saved=1`);
+  }
+
+  const { data: spots } = await supabase
     .from("spots")
     .select("id")
-    .eq("id", parsed.data.existingSpotId)
-    .maybeSingle();
-  if (!spot) return { error: "選んだスポットが見つかりませんでした。もう一度選び直してください。", values };
+    .in("id", pending.map((item) => item.spotId));
+  const readableSpotIds = new Set((spots ?? []).map((s) => s.id));
+  const toInsert = pending.filter((item) => readableSpotIds.has(item.spotId));
 
-  const { error: visitError } = await supabase.from("visit_records").insert({
-    id: parsed.data.visitId,
-    user_id: user.id,
-    trip_id: parsed.data.tripId,
-    journey_id: parsed.data.journeyId,
-    spot_id: spot.id,
-    visited_at: parsed.data.visitedAt,
-    rating: parsed.data.rating,
-    comment: parsed.data.comment,
-    note: parsed.data.note,
-    companions: parsed.data.companions,
-    amount: parsed.data.amount,
-    stay_minutes: parsed.data.stayMinutes,
-    congestion_level: parsed.data.congestionLevel,
-    revisit_wanted: values.revisitWanted === "on",
-    favorite: values.favorite === "on",
-  });
+  if (toInsert.length === 0) {
+    return { error: "選んだスポットが見つかりませんでした。もう一度選び直してください。", values };
+  }
+
+  const { error: visitError } = await supabase.from("visit_records").insert(
+    toInsert.map((item) => ({
+      id: item.visitId,
+      user_id: user.id,
+      trip_id: parsed.data.tripId,
+      journey_id: parsed.data.journeyId,
+      spot_id: item.spotId,
+      visited_at: parsed.data.visitedAt,
+      rating: parsed.data.rating,
+      comment: parsed.data.comment,
+      note: parsed.data.note,
+      companions: parsed.data.companions,
+      amount: parsed.data.amount,
+      stay_minutes: parsed.data.stayMinutes,
+      congestion_level: parsed.data.congestionLevel,
+      revisit_wanted: values.revisitWanted === "on",
+      favorite: values.favorite === "on",
+    })),
+  );
 
   if (visitError) {
-    console.error("Visit insert for existing spot failed", {
+    console.error("Visit insert for existing spots failed", {
       code: visitError.code,
       message: visitError.message,
       details: visitError.details,
       hint: visitError.hint,
       tripId: parsed.data.tripId,
-      spotId: spot.id,
+      spotIds: toInsert.map((item) => item.spotId),
     });
     return { error: toJapaneseError(visitError, "行った場所の保存に失敗しました。"), values };
   }
 
-  await Promise.all([
-    syncPhotos(supabase, user.id, parsed.data.tripId, parsed.data.visitId, parsePhotoPaths(formData)),
-    syncVisitTags(supabase, user.id, parsed.data.visitId, values.tags),
-  ]);
+  const photoPaths = parsePhotoPaths(formData);
+  await Promise.all(
+    toInsert.flatMap((item) => [
+      // 同じ写真を複数の訪問記録へ付けるため、move ではなく copy で残す
+      syncPhotos(supabase, user.id, parsed.data.tripId, item.visitId, photoPaths, true),
+      syncVisitTags(supabase, user.id, item.visitId, values.tags),
+    ]),
+  );
 
   revalidatePath("/home");
   revalidatePath("/map");
   revalidatePath("/records");
-  revalidatePath(`/spots/${spot.id}`);
+  for (const item of toInsert) revalidatePath(`/spots/${item.spotId}`);
   revalidatePath(`/trips/${parsed.data.tripId}`);
-  redirect(`/spots/${spot.id}?saved=1&trip=${parsed.data.tripId}`);
+  redirect(`/trips/${parsed.data.tripId}?saved=1`);
 }
 
 export async function updateSpotAction(_prev: ActionState, formData: FormData): Promise<ActionState> {

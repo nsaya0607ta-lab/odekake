@@ -2,11 +2,10 @@
 
 import Link from "next/link";
 import { useActionState, useEffect, useState } from "react";
-import { createVisitedSpotAction, createVisitForExistingSpotAction, updateSpotAction } from "@/app/actions/spots";
+import { createVisitedSpotAction, createVisitsForExistingSpotsAction, updateSpotAction } from "@/app/actions/spots";
 import { ExistingSpotPicker, type ExistingSpotOption } from "@/components/existing-spot-picker";
 import { FormDraft } from "@/components/form-draft";
 import { emptyActionState, Field, FormMessage, SubmitButton } from "@/components/form";
-import { IconMapPin } from "@/components/icons";
 import {
   LocationPicker,
   type PlaceAutofill,
@@ -88,16 +87,24 @@ export function SpotForm({
 }) {
   const isEdit = Boolean(spotId);
   const [spotMode, setSpotMode] = useState<"new" | "existing">("new");
-  const [existingSpot, setExistingSpot] = useState<ExistingSpotOption | null>(null);
+  const [existingSpots, setExistingSpots] = useState<Array<{ spot: ExistingSpotOption; visitId: string }>>([]);
   const action = isEdit
     ? updateSpotAction
     : spotMode === "existing"
-      ? createVisitForExistingSpotAction
+      ? createVisitsForExistingSpotsAction
       : createVisitedSpotAction;
   const [state, formAction] = useActionState(action, emptyActionState);
   const initial = { ...defaults, ...(state.values ?? {}) };
   const [tripId, setTripId] = useState(state.values?.tripId ?? initialTripId ?? destinations?.personal?.id ?? "");
   const [visitId, setVisitId] = useState("");
+
+  const toggleExistingSpot = (spot: ExistingSpotOption) => {
+    setExistingSpots((current) =>
+      current.some((item) => item.spot.id === spot.id)
+        ? current.filter((item) => item.spot.id !== spot.id)
+        : [...current, { spot, visitId: crypto.randomUUID() }],
+    );
+  };
   const [locationPickerReady, setLocationPickerReady] = useState(isEdit);
   const visitIdStorageKey = "odekake:visited-place-id";
 
@@ -199,31 +206,18 @@ export function SpotForm({
 
         {!isEdit && spotMode === "existing" ? (
           <>
-            <input type="hidden" name="existingSpotId" value={existingSpot?.id ?? ""} />
-            {state.fieldErrors?.existingSpotId ? (
-              <p className="text-xs text-[#a85c6a]">{state.fieldErrors.existingSpotId}</p>
+            <input
+              type="hidden"
+              name="existingSpots"
+              value={JSON.stringify(existingSpots.map(({ spot, visitId: id }) => ({ spotId: spot.id, visitId: id })))}
+            />
+            {state.fieldErrors?.existingSpots ? (
+              <p className="text-xs text-[#a85c6a]">{state.fieldErrors.existingSpots}</p>
             ) : null}
-            {existingSpot ? (
-              <div className="rough-card flex items-center gap-3 border border-leaf/70 p-3.5">
-                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-leaf-soft text-leaf-deep">
-                  <IconMapPin size={21} />
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="text-[11px] font-semibold text-leaf-deep">選択中のスポット</p>
-                  <p className="mt-0.5 truncate text-sm font-bold">{existingSpot.name}</p>
-                  <p className="mt-0.5 truncate text-[11px] text-ink-faint">{existingSpot.address ?? "住所情報なし"}</p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setExistingSpot(null)}
-                  className="shrink-0 rounded-full border border-leaf px-3 py-1.5 text-xs font-semibold text-leaf-deep"
-                >
-                  変更
-                </button>
-              </div>
-            ) : (
-              <ExistingSpotPicker onSelect={setExistingSpot} />
-            )}
+            <p className="px-1 text-xs text-ink-soft">
+              {existingSpots.length > 0 ? `${existingSpots.length}件のスポットを選択中。まとめて訪問の記録を追加します。` : "同じ旅行で訪れたスポットを複数選べます。"}
+            </p>
+            <ExistingSpotPicker selected={existingSpots.map((item) => item.spot)} onToggle={toggleExistingSpot} />
           </>
         ) : (
           <>
@@ -559,10 +553,16 @@ export function SpotForm({
             ((!destinations?.personal && !destinations?.shared.length) ||
               !tripId ||
               !visitId ||
-              (spotMode === "existing" && !existingSpot))
+              (spotMode === "existing" && existingSpots.length === 0))
           }
         >
-          {isEdit ? "変更を保存する" : spotMode === "existing" ? "この訪問を記録する" : "この場所を登録する"}
+          {isEdit
+            ? "変更を保存する"
+            : spotMode === "existing"
+              ? existingSpots.length > 1
+                ? `選んだ${existingSpots.length}件を記録する`
+                : "この訪問を記録する"
+              : "この場所を登録する"}
         </SubmitButton>
       </div>
       {!isEdit ? (
