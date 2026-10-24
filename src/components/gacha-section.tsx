@@ -16,7 +16,7 @@ import { BlueCoinArt, GachaMachineArt, SparkleArt } from "./coin-art";
 import { warmGachaArt } from "./gacha/art";
 import { primeGachaAudio } from "./gacha/audio";
 import type { AnimationDraw, DrawResult } from "./gacha/types";
-import { prefGachaRates } from "@/lib/gacha/prizes";
+import { PREF_GACHA_PRIZES, prefGachaRates } from "@/lib/gacha/prizes";
 import { IconClose, IconCoin } from "./icons";
 import { lockPageScroll } from "@/lib/scroll-lock";
 
@@ -199,7 +199,8 @@ export function GachaSection({ balance, pool = "coin" }: { balance: number; pool
                 <span className="block whitespace-nowrap">青コインをつかって</span>
                 <span className="block whitespace-nowrap">ご当地のアイテムをゲット！</span>
               </p>
-              <p className="mt-1 text-[9px] font-semibold text-ink-faint">福井・長野・岐阜・愛知・三重・静岡の名物と観光地</p>
+              {/* 県が増えても長くならないよう、数で出す（くわしくは都道府県図鑑で） */}
+              <p className="mt-1 text-[9px] font-semibold text-ink-faint">いまは {new Set(PREF_GACHA_PRIZES.map((p) => p.pref)).size}県の名物と観光地</p>
             </>
           ) : (
             <>

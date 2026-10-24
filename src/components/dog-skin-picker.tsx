@@ -2,7 +2,8 @@
 
 import { useRouter } from "next/navigation";
 import { useCallback, useState } from "react";
-import { DOG_SKINS, getFrenchieSrc, isSkinUnlocked, type DogSkinId } from "@/lib/dog-skins";
+import { DOG_SKINS, getFrenchieSrc, isSkinUnlocked, type DogSkin, type DogSkinId } from "@/lib/dog-skins";
+import { getPrize } from "@/lib/gacha/prizes";
 import { IconCheck, IconLock } from "./icons";
 
 type Props = {
@@ -10,6 +11,9 @@ type Props = {
   /** 図鑑の所持アイテムid一覧。Set はサーバー→クライアントの境界をまたがせず、配列で渡す */
   ownedItemIds: readonly string[];
 };
+
+/** 都道府県ガチャ（青コイン）で手に入る、ご当地のすがたか */
+const isLocalSkin = (skin: DogSkin) => Boolean(skin.unlockItemId && getPrize(skin.unlockItemId)?.pref);
 
 export function DogSkinPicker({ currentSkin, ownedItemIds }: Props) {
   const router = useRouter();
@@ -46,10 +50,24 @@ export function DogSkinPicker({ currentSkin, ownedItemIds }: Props) {
     [selected, pending, router],
   );
 
+  // 「いつもの・シリーズ」と「ご当地」に分けて並べる（ご当地は数が増えていくので、見出しと集めた数を出す）
+  const groups = [
+    { key: "series", title: "いつもの・シリーズ", hint: "コインのガチャで解放", skins: DOG_SKINS.filter((s) => !isLocalSkin(s)) },
+    { key: "local", title: "ご当地フレブル", hint: "都道府県ガチャで解放", skins: DOG_SKINS.filter(isLocalSkin) },
+  ].filter((g) => g.skins.length > 0);
+
   return (
-    <div className="space-y-3">
+    <div className="space-y-5">
+      {groups.map((group) => (
+      <section key={group.key} className="space-y-2">
+        <div className="flex items-baseline justify-between px-1">
+          <h2 className="text-[13px] font-black text-ink">{group.title}</h2>
+          <p className="text-[11px] font-bold tabular-nums text-ink-faint">
+            {group.skins.filter((s) => isSkinUnlocked(s, owned)).length} / {group.skins.length}
+          </p>
+        </div>
       <div className="grid grid-cols-2 gap-3">
-        {DOG_SKINS.map((skin) => {
+        {group.skins.map((skin) => {
           const unlocked = isSkinUnlocked(skin, owned);
           const active = skin.id === selected;
           return (
@@ -95,12 +113,14 @@ export function DogSkinPicker({ currentSkin, ownedItemIds }: Props) {
                 {unlocked ? skin.name : "シークレット"}
               </p>
               <p className="mt-0.5 truncate text-[10px] text-ink-faint">
-                {unlocked ? skin.description : "ガチャで手に入れると解放"}
+                {unlocked ? skin.description : group.hint}
               </p>
             </button>
           );
         })}
       </div>
+      </section>
+      ))}
 
       {error ? (
         <p className="text-center text-[11px] text-blossom">変更できませんでした。もう一度お試しください。</p>
